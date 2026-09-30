@@ -87,6 +87,11 @@ describe('categories', () => {
     expect(() => addCategory(budget, '   ')).toThrow(/empty/)
   })
 
+  it('have names of at most 15 characters', () => {
+    expect(snapshot(addCategory(starterBudget(), 'Fifteen chars!!')).categories.at(-1)?.name).toBe('Fifteen chars!!')
+    expect(() => addCategory(starterBudget(), 'Sixteen chars!!!')).toThrow(/15 characters/)
+  })
+
   it('return their money to Ready to Assign when deleted', () => {
     let budget = deposit(starterBudget(), 10_000_000n)
     budget = move(budget, READY_TO_ASSIGN, 'starter-3', 7_000_000n)
