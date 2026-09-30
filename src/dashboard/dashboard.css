@@ -1,0 +1,94 @@
+/* Desktop dashboard, rebuilt from the approved prototype (v2, wheel 1).
+   Every component is absolutely positioned on a fixed 1280 x 800 stage. */
+
+#stage { position: relative; width: 1280px; height: 800px; margin: 0 auto; overflow: hidden; }
+.sr { position: absolute; left: -9999px; }
+.comp { position: absolute; }
+.box { border: 1.6px solid var(--ink); border-radius: var(--rough); background: #fff; }
+.muted { color: var(--ink2); }
+small { font-size: 11px; }
+svg text { font-family: var(--hand); }
+#stage button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* refresh (placeholder) */
+#refresh { left: 20px; top: 20px; width: 110px; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+#refreshBtn { width: 84px; height: 84px; border: 1.6px solid var(--ink); border-radius: 14px 9px 16px 8px; display: flex; align-items: center; justify-content: center; background: #fff; }
+#refreshBtn svg { width: 60px; height: 60px; }
+#updated { font-size: 11px; color: var(--ink2); white-space: nowrap; position: absolute; top: 118px; left: 0; width: 150px; }
+
+/* price chart (placeholder) */
+#chartC { left: 190px; top: 18px; width: 800px; height: 190px; padding: 6px; }
+#chart { width: 100%; height: 100%; display: block; }
+
+/* day-range wheel (placeholder) */
+#pieC { left: 1030px; top: 8px; width: 230px; height: 218px; }
+#pie { width: 230px; height: 200px; display: block; }
+#pie .wedge path { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
+#pie .wedge.sel path { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.4; }
+#pie .wedge text { font-size: 26px; fill: var(--ink); }
+#pieCap { text-align: center; font-size: 12px; color: var(--ink2); margin-top: -6px; }
+
+/* holdings */
+#holdC { left: 20px; top: 162px; width: 150px; height: 400px; }
+#holdBox { width: 100%; height: 100%; overflow: auto; }
+#holdBox .ttl { font-size: 11px; color: var(--ink2); padding: 4px 10px; border-bottom: 1px solid var(--ink3); }
+.hrow { display: flex; flex-direction: column; width: 100%; text-align: left; border: 0; border-bottom: 1.2px solid var(--ink); padding: 5px 12px; font-size: 18px; line-height: 1.1; }
+.hrow small { color: var(--ink2); }
+.hrow.act { box-shadow: inset 4px 0 0 var(--accent); }
+
+/* categories table */
+#tableC { left: 190px; top: 232px; width: 740px; height: 310px; display: flex; flex-direction: column; overflow: hidden; z-index: 3; }
+#tblScroll { flex: 1; overflow: auto; }
+table.bud { width: 100%; border-collapse: collapse; }
+table.bud td { border-bottom: 1.2px solid var(--ink); padding: 0 14px; height: 44px; font-size: 19px; }
+table.bud td + td { border-left: 1.2px solid var(--ink); width: 170px; text-align: right; white-space: nowrap; }
+table.bud td.cat small { color: var(--ink2); margin-left: 8px; font-size: 11px; }
+table.bud tr.ready td { background: #f8f7f1; }
+table.bud td.empty { height: auto; padding: 30px; text-align: center; color: var(--ink2); font-size: 16px; }
+.tfoot { display: flex; border-top: 1.6px solid var(--ink); height: 40px; font-size: 20px; }
+.tfoot div { display: flex; align-items: center; padding: 0 14px; }
+.tfoot .c1 { flex: 1; font-size: 12px; color: var(--ink2); }
+.tfoot .c2, .tfoot .c3 { width: 170px; justify-content: center; border-left: 1.2px solid var(--ink); }
+.arrow { border: 0; font-size: 24px; line-height: 1; padding: 2px 10px; border-radius: 8px; }
+.arrow .lab { font-size: 11px; color: var(--ink2); margin-left: 4px; vertical-align: middle; }
+#tblArrowC { left: 360px; top: 546px; z-index: 4; }
+
+/* Add / Move / Delete: small squares attached to the top edge of the table, at its left end.
+   They sit in the 24px gap between the chart (bottom 208px) and the table (top 232px). */
+#catTools { left: 206px; top: 211px; height: 22px; display: flex; z-index: 4; }
+.sq { width: 22px; height: 22px; padding: 0; margin-right: -1.4px; border: 1.4px solid var(--ink); border-bottom: 0; border-radius: 4px 4px 0 0; background: #fff; font-size: 15px; line-height: 1; }
+.sq svg { display: block; width: 14px; height: 14px; margin: 0 auto; }
+.sq:hover { background: #f3f3ef; }
+
+/* Deposit / Spend: rounded buttons below the table's bottom-right corner, separate from it.
+   They sit in the gap between the table (bottom 542px) and the transaction history (top 592px). */
+#moneyTools { right: 350px; top: 551px; display: flex; gap: 10px; z-index: 4; }
+.rr { width: 84px; height: 32px; border: 1.6px solid var(--ink); border-radius: 10px; background: #fff; font-size: 15px; box-shadow: 2px 3px 0 var(--ink2); }
+.rr:hover { background: #f3f3ef; }
+
+/* category filters (placeholder) */
+#filtC { left: 952px; top: 246px; width: 160px; display: flex; flex-direction: column; gap: 22px; }
+.pill { height: 48px; border: 1.6px solid var(--ink); border-radius: 50% / 50%; background: #fff; font-size: 17px; box-shadow: 2px 3px 0 var(--ink2); }
+#filtHint { font-size: 11px; color: var(--ink2); text-align: center; margin-top: -12px; }
+
+/* coin wheel (placeholder, wheel 1) */
+#arcC { left: 280px; top: 556px; width: 560px; height: 170px; }
+#arcSvg { position: absolute; left: 0; top: 0; width: 560px; height: 170px; overflow: visible; pointer-events: none; }
+.tab { position: absolute; left: 0; top: 0; width: 70px; height: 34px; padding: 0; border: 1.4px solid var(--ink); border-radius: 4px; background: #fff; font-size: 15px; }
+.tab.act { background: var(--accent-soft); border-color: var(--accent); border-width: 2.2px; font-weight: bold; color: #1e3d57; }
+.arcNav { position: absolute; top: 92px; width: 34px; height: 34px; padding: 0 0 4px; border: 1.4px solid var(--ink); border-radius: 50%; background: #fff; font-size: 26px; line-height: 1; z-index: 2; }
+#arcPrev { left: -30px; }
+#arcNext { right: -30px; }
+
+/* boss (placeholder) */
+#bossC { left: 500px; top: 742px; width: 130px; height: 44px; }
+#bossBtn { width: 100%; height: 100%; border: 1.6px solid var(--ink); border-radius: 18px 6px 20px 5px; background: #fff; font-size: 20px; letter-spacing: 2px; box-shadow: 3px 3px 0 var(--ink2); }
+
+/* transaction history (placeholder) */
+#txC { left: 870px; top: 592px; width: 390px; height: 152px; }
+table.tx { width: 100%; border-collapse: collapse; }
+table.tx td { border-bottom: 1.2px solid var(--ink); height: 37px; padding: 0 10px; font-size: 16px; white-space: nowrap; }
+table.tx td + td { border-left: 1.2px solid var(--ink); }
+table.tx td.num { text-align: right; }
+.squig { display: inline-block; width: 52px; height: 10px; vertical-align: middle; }
+#txArrowC { left: 1040px; top: 750px; }

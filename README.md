@@ -67,3 +67,9 @@ The tests cover every rule, including a **stress test**. It runs a long sequence
 ```bash
 STRESS_OPS=3000 STRESS_SEED=12345 npm test
 ```
+
+### Dashboard
+
+The desktop dashboard lives in `src/dashboard/`, one file per component. It is a fixed 1280 x 800 layout rebuilt from the approved prototype design, with every component placed at a fixed position so that adding or changing one never moves another.
+
+Parts of the dashboard that are outside V1 (price refresh, price chart, day-range selector, category filters, coin wheel, BOSS and transaction history) are shown as placeholders that do nothing. The USD column shows `$0.00` until prices are added.
