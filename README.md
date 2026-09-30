@@ -51,4 +51,19 @@ Built with Vite, React and TypeScript. Vercel deploys every merge to `main`.
 npm install
 npm run dev      # local development server
 npm run build    # type-check and production build
+npm test         # automated tests
+```
+
+### Accounting core and tests
+
+The budget rules live in `src/ledger/`, separate from any screen:
+
+- `drops.ts` converts between typed XRP amounts and drops.
+- `ledger.ts` holds the entries, the rules and the guardrail check.
+- `storage.ts` saves to and loads from the browser. It refuses damaged data rather than overwriting it.
+
+The tests cover every rule, including a **stress test**. It runs a long sequence of random deposits, spends, moves, additions and deletions (many of them deliberately invalid) and checks the ledger against a separate simple model after every step. Locally it runs 500 operations. The GitHub check on every pull request runs 3,000, with a new random seed each run. To replay a run, set `STRESS_OPS` and `STRESS_SEED`:
+
+```bash
+STRESS_OPS=3000 STRESS_SEED=12345 npm test
 ```
