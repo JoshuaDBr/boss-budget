@@ -77,9 +77,10 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
       run = () => spend(budget, from, a)
       update = () => { model.set(from, model.get(from)! - a); total -= a }
     } else if (roll < 0.93 || others.length === 0) {
-      const id = `stress-${nextId++}`
+      const n = nextId++
+      const id = `stress-${n}`
       expectOk = true
-      run = () => addCategory(budget, `Category ${id}`, id)
+      run = () => addCategory(budget, `Cat ${n}`, id)
       update = () => model.set(id, 0n)
     } else {
       const id = rand() < 0.1 ? READY_TO_ASSIGN : pick(others)

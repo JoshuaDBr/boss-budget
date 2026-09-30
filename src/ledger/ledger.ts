@@ -7,6 +7,8 @@ import { formatXrp } from './drops'
 
 export const READY_TO_ASSIGN = 'ready'
 export const STARTER_CATEGORIES = ['Groceries', 'Gas', 'Emergency'] as const
+/** Longest allowed category name, in characters. "Ready to Assign" is exactly this long. */
+export const MAX_NAME_LENGTH = 15
 
 export type Entry =
   | { kind: 'addCategory'; id: string; name: string }
@@ -77,6 +79,9 @@ export function snapshot(budget: Budget): Snapshot {
       case 'addCategory': {
         const name = entry.name.trim()
         if (!name) throw new BudgetError('Category name cannot be empty')
+        if ([...name].length > MAX_NAME_LENGTH) {
+          throw new BudgetError(`Category names are limited to ${MAX_NAME_LENGTH} characters`)
+        }
         if (categories.has(entry.id)) throw new BudgetError(`Duplicate category id: ${entry.id}`)
         const lower = name.toLowerCase()
         for (const category of categories.values()) {

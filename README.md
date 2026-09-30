@@ -73,3 +73,13 @@ STRESS_OPS=3000 STRESS_SEED=12345 npm test
 The desktop dashboard lives in `src/dashboard/`, one file per component. It is a fixed 1280 x 800 layout rebuilt from the approved prototype design, with every component placed at a fixed position so that adding or changing one never moves another.
 
 Parts of the dashboard that are outside V1 (price refresh, price chart, day-range selector, category filters, coin wheel, BOSS and transaction history) are shown as placeholders that do nothing. The USD column shows `$0.00` until prices are added.
+
+### Categories: add, move and delete
+
+The three small squares on top of the categories table open a pop-up just below the table. Nothing reaches the ledger until the pop-up's Save (or Delete Category) is pressed, and every accepted change is saved to the browser straight away. Escape is the same as Cancel.
+
+- **Add** puts a new blank row at the bottom of the table, ready for typing. Names are limited to 15 characters and must not match an existing name (capitals ignored). While naming, only the name box, Save and Cancel respond; clicking elsewhere with the box still empty cancels.
+- **Move** chooses From, To and an amount, in any order, by clicking categories in the table. A category with 0 XRP cannot give, and the From category cannot also receive.
+- **Delete** chooses any category except Ready to Assign, and returns its XRP to Ready to Assign after confirmation.
+
+The screen rules are in `src/dashboard/categoryRules.ts` and `categoryMode.ts`, with their tests alongside.
