@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { MAX_NAME_LENGTH, type Snapshot } from '../ledger/ledger'
+import type { Snapshot } from '../ledger/ledger'
 import type { Mode, MoveField, MoveMode } from './categoryMode'
 import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
 
@@ -17,14 +17,14 @@ interface Props {
   onCancel: () => void
 }
 
-const TITLES = { add: 'Add a category', move: 'Move XRP', delete: 'Delete a category' }
+const LABELS = { add: 'Add a category', move: 'Move XRP', delete: 'Delete a category' }
 
 export default function CategoryPopup({ snapshot, mode, ready, error, onChange, onSave, onCancel }: Props) {
   const nameOf = (id?: string) => snapshot.categories.find(c => c.id === id)?.name
 
   return (
-    <section id="popC" className={`comp box pop-${mode.kind}`} role="dialog" aria-label={TITLES[mode.kind]}>
-      <div className="popTitle">{TITLES[mode.kind]}</div>
+    <section id="popC" className={`comp box pop-${mode.kind}`} role="dialog" aria-label={LABELS[mode.kind]}>
+      {mode.kind === 'add' && <div className="popTitle">Add a category</div>}
       {mode.kind === 'move' && (
         <MoveFields
           mode={mode}
@@ -60,23 +60,19 @@ export default function CategoryPopup({ snapshot, mode, ready, error, onChange, 
   )
 }
 
-/** The guidance line beside the buttons. */
+/**
+ * The line beside the buttons. It only speaks up for a duplicate name, a move larger than the
+ * From balance, and the delete confirmation; otherwise it is empty.
+ */
 function note(mode: Mode, snapshot: Snapshot): string {
   switch (mode.kind) {
-    case 'add': {
-      const problem = nameProblem(mode.name, snapshot.categories)
-      if (problem === 'duplicate') return 'A category with that name already exists.'
-      return `Name the new category (up to ${MAX_NAME_LENGTH} characters). Enter saves, Escape cancels.`
-    }
-    case 'move': {
-      if (mode.active === 'from') return 'Select the category to move XRP from.'
-      if (mode.active === 'to') return 'Select the category to move XRP to.'
-      const from = snapshot.categories.find(c => c.id === mode.from)
-      return checkAmount(mode.amount, from).problem || 'Type the amount of XRP to move.'
-    }
+    case 'add':
+      return nameProblem(mode.name, snapshot.categories) === 'duplicate' ? 'A category with that name already exists.' : ''
+    case 'move':
+      return checkAmount(mode.amount, snapshot.categories.find(c => c.id === mode.from)).problem ?? ''
     case 'delete': {
       const category = snapshot.categories.find(c => c.id === mode.id)
-      return category ? deleteMessage(category) : 'Select the category to delete.'
+      return category ? deleteMessage(category) : ''
     }
   }
 }
@@ -109,14 +105,13 @@ function MoveFields({ mode, fromName, toName, problem, ready, onChange, onSave }
           aria-label="XRP to move"
           inputMode="decimal"
           autoComplete="off"
-          placeholder="0"
           value={mode.amount}
           onFocus={() => activate('amount')}
           onChange={e => onChange({ ...mode, amount: e.target.value })}
           onKeyDown={e => e.key === 'Enter' && ready && onSave()}
         />
       </label>
-      <div className="fld num usd" aria-label="US dollars (not available yet)" title="USD prices are not part of version 1">
+      <div className="fld num usd" aria-label="US dollars (not available yet)">
         $0.00
       </div>
       <Field label="to" value={toName} active={mode.active === 'to'} onFocus={() => activate('to')} />
@@ -128,7 +123,7 @@ function Field({ label, value, active, onFocus }: { label: string; value?: strin
   return (
     <button type="button" className={active ? 'fld on' : 'fld'} onClick={onFocus}>
       <span className="lab">{label}</span>
-      {value ?? <span className="muted">select a category</span>}
+      {value}
     </button>
   )
 }

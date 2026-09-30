@@ -42,13 +42,10 @@ describe('move amounts', () => {
     expect(checkAmount(' 3 ', ready)).toEqual({ drops: 3_000_000n })
   })
 
-  it('are refused otherwise', () => {
-    expect(checkAmount('', groceries).problem).toBe('')
-    expect(checkAmount('0', groceries).problem).toMatch(/above 0/)
-    expect(checkAmount('0.000000', groceries).problem).toMatch(/above 0/)
-    expect(checkAmount('1.0000001', groceries).problem).toMatch(/6 decimal/)
-    expect(checkAmount('-1', groceries).problem).toMatch(/such as/)
-    expect(checkAmount('abc', groceries).problem).toMatch(/such as/)
+  it('are refused otherwise, explaining only a shortfall in the From category', () => {
+    for (const input of ['', '0', '0.000000', '1.0000001', '-1', 'abc']) {
+      expect(checkAmount(input, groceries)).toEqual({ problem: '' })
+    }
     expect(checkAmount('12.500001', groceries).problem).toBe('Groceries holds only 12.5 XRP')
   })
 })

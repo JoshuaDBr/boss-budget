@@ -103,7 +103,7 @@ table.bud tr.chosen td, table.bud tr.chosen:hover td { background: var(--accent-
 
 /* the new, unsaved row while adding */
 table.bud tr.draft td { background: #fffdf2; }
-table.bud tr.draft.bad { outline: 2px solid #c0392b; outline-offset: -2px; }
+table.bud tr.draft.ok { outline: 2px solid #2e8b57; outline-offset: -2px; }
 table.bud tr.draft input { width: 100%; border: 0; outline: 0; padding: 0; background: transparent; font: inherit; color: inherit; }
 table.bud tr.draft td + td { color: var(--ink3); }
 
@@ -112,7 +112,7 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .sq.dull:hover, .rr.dull:hover { background: #fff; }
 
 /* the Add / Move / Delete pop-up: table width, just below the table (bottom 542px), over the wheel area */
-#popC { left: 190px; top: 550px; width: 740px; z-index: 6; padding: 8px 0 12px; box-shadow: 3px 4px 0 var(--ink3); }
+#popC { left: 190px; top: 550px; width: 740px; z-index: 6; padding: 12px 0; box-shadow: 3px 4px 0 var(--ink3); }
 .popTitle { padding: 0 14px 6px; font-size: 12px; color: var(--ink2); }
 .popGrid { display: grid; grid-template-columns: 1fr 170px 170px; row-gap: 8px; }
 .popGrid > * { margin: 0 12px; }
@@ -131,4 +131,3 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .pb.main { box-shadow: 2px 3px 0 var(--ink2); }
 .pb.main.dull:hover { background: #fff; }
 .pop-delete .pb.main:not(.dull) { border-color: #a93226; color: #a93226; }
-.fld.amt input::placeholder { color: var(--ink3); }

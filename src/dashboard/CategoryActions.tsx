@@ -26,7 +26,7 @@ export default function CategoryActions({ blocked, onStart }: Props) {
           className={blocked ? 'sq dull' : 'sq'}
           aria-label={a.label}
           aria-disabled={blocked ? true : undefined}
-          title={blocked ?? a.title}
+          title={a.title}
           onClick={blocked ? undefined : () => onStart(a.start())}
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">

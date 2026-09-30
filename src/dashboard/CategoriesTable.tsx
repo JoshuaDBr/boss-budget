@@ -69,7 +69,8 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                 </tr>
               )}
               {mode?.kind === 'add' && budget.snapshot && (
-                <tr className={nameProblem(mode.name, budget.snapshot.categories) ? 'draft bad' : 'draft'}>
+                // Green outline once the name can be saved; no outline while it is blank or a duplicate.
+                <tr className={nameProblem(mode.name, budget.snapshot.categories) ? 'draft' : 'draft ok'}>
                   <td className="cat">
                     <input
                       ref={nameBox}

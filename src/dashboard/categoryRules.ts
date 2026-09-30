@@ -28,15 +28,11 @@ export type AmountCheck = { drops: bigint; problem?: undefined } | { drops?: und
 
 /**
  * Checks a typed move amount: above zero, at most 6 decimal places, and no more than the From balance.
- * An empty box has no problem message; it is simply not ready.
+ * Only "more than the From balance" carries a message for the screen; any other problem just keeps Save dull.
  */
 export function checkAmount(input: string, from?: Category): AmountCheck {
-  if (!input.trim()) return { problem: '' }
   const drops = parseXrp(input)
-  if (drops === null) {
-    return { problem: /^\s*\d*\.\d{7,}\s*$/.test(input) ? 'XRP has at most 6 decimal places' : 'Type an amount such as 12 or 0.5' }
-  }
-  if (drops <= 0n) return { problem: 'The amount must be above 0' }
+  if (drops === null || drops <= 0n) return { problem: '' }
   if (from && drops > from.balance) {
     return { problem: `${from.name} holds only ${formatXrp(from.balance)} XRP` }
   }
