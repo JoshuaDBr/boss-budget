@@ -11,7 +11,7 @@ export default function TransactionHistory() {
           <tbody>
             {Array.from({ length: ROWS }, (_, i) => (
               <tr key={i}>
-                <td className="desc">
+                <td className="note">
                   <svg className="squig" viewBox="0 0 52 10" aria-hidden="true">
                     <path d="M1 6 q3 -6 6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0" fill="none" stroke="#bbb" strokeWidth="1.4" />
                   </svg>

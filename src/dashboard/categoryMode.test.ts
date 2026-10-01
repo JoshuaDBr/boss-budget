@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { READY_TO_ASSIGN, deposit, move, snapshot, starterBudget, type Category } from '../ledger/ledger'
-import { choose, isChoosable, pendingChange, startAdd, startDelete, startMove, type Mode } from './categoryMode'
+import { choose, isChoosable, pendingChange, startAdd, startDelete, startDeposit, startMove, startSpend, type Mode } from './categoryMode'
 
 const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000n }
 const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_000_000n }
@@ -50,6 +50,24 @@ describe('delete pop-up', () => {
   })
 })
 
+describe('spend pop-up', () => {
+  it('chooses only categories that hold XRP, never Ready to Assign, then moves to the amount', () => {
+    const start = startSpend()
+    expect(isChoosable(start, ready)).toBe(false)
+    expect(isChoosable(start, gas)).toBe(false)
+    expect(choose(start, ready)).toBe(start)
+    const chosen = choose(start, groceries)
+    expect(chosen).toMatchObject({ from: 'g', active: 'amount' })
+    expect(isChoosable(chosen, groceries)).toBe(false)
+  })
+})
+
+describe('deposit pop-up', () => {
+  it('never chooses rows', () => {
+    expect(isChoosable(startDeposit(), groceries)).toBe(false)
+  })
+})
+
 describe('add pop-up', () => {
   it('never chooses rows', () => {
     expect(isChoosable(startAdd(), groceries)).toBe(false)
@@ -73,6 +91,11 @@ describe('Save', () => {
     expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '0' }, categories)).toBeNull()
     expect(pendingChange(startDelete(), categories)).toBeNull()
     expect(pendingChange({ kind: 'delete', id: READY_TO_ASSIGN }, categories)).toBeNull()
+    expect(pendingChange(startDeposit(), categories)).toBeNull()
+    expect(pendingChange({ kind: 'deposit', amount: '1.0000001' }, categories)).toBeNull()
+    expect(pendingChange({ ...startSpend(), amount: '1' }, categories)).toBeNull()
+    expect(pendingChange({ kind: 'spend', from: 'starter-1', amount: '4.000001', active: 'amount' }, categories)).toBeNull()
+    expect(pendingChange({ kind: 'spend', from: READY_TO_ASSIGN, amount: '1', active: 'amount' }, categories)).toBeNull()
   })
 
   it('adds, moves and deletes through the ledger', () => {
@@ -84,5 +107,15 @@ describe('Save', () => {
       'Emergency 4000000',
     ])
     expect(after({ kind: 'delete', id: 'starter-1' })).toEqual(['Ready to Assign 10000000', 'Gas 0', 'Emergency 0'])
+  })
+
+  it('deposits into Ready to Assign with no upper limit, and spends from a category', () => {
+    expect(after({ kind: 'deposit', amount: '1000000000.5' })?.[0]).toBe('Ready to Assign 1000000006500000')
+    expect(after({ kind: 'spend', from: 'starter-1', amount: '4', active: 'amount' })).toEqual([
+      'Ready to Assign 6000000',
+      'Groceries 0',
+      'Gas 0',
+      'Emergency 0',
+    ])
   })
 })
