@@ -111,7 +111,7 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .dull { opacity: 0.35; cursor: default; }
 .sq.dull:hover, .rr.dull:hover { background: #fff; }
 
-/* the Add / Move / Delete pop-up: table width, just below the table (bottom 542px), over the wheel area */
+/* the Add / Move / Delete / Deposit / Spend pop-up: table width, just below the table (bottom 542px), over the wheel area */
 #popC { left: 190px; top: 550px; width: 740px; z-index: 6; padding: 12px 0; box-shadow: 3px 4px 0 var(--ink3); }
 .popTitle { padding: 0 14px 6px; font-size: 12px; color: var(--ink2); }
 .popGrid { display: grid; grid-template-columns: 1fr 170px 170px; row-gap: 8px; }
@@ -123,6 +123,8 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .fld.amt input { width: 100%; border: 0; outline: 0; padding: 0; background: transparent; font: inherit; color: inherit; text-align: right; }
 .fld.amt.bad input { color: #c0392b; }
 .fld.usd { color: var(--ink3); background: #fafaf7; }
+.fld.ph { background: #fafaf7; border-color: var(--ink3); }
+.fld.ph.wide { grid-column: span 2; }
 .popFoot { display: flex; align-items: center; gap: 10px; padding: 12px 12px 0; }
 .popNote { flex: 1; padding-left: 2px; font-size: 13px; color: var(--ink2); }
 .popNote.err { color: #c0392b; }

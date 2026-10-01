@@ -14,9 +14,10 @@ interface Props {
   onSaveName: () => void
 }
 
-/** What a chosen row is labelled with while Move or Delete is open. */
+/** What a chosen row is labelled with while Move, Delete or Spend is open. */
 function chosenAs(mode: Mode | null, id: string): string | null {
   if (mode?.kind === 'move') return mode.from === id ? 'from' : mode.to === id ? 'to' : null
+  if (mode?.kind === 'spend') return mode.from === id ? 'from' : null
   if (mode?.kind === 'delete') return mode.id === id ? 'delete' : null
   return null
 }

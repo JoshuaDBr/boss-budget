@@ -1,7 +1,7 @@
 import { formatXrp, parseXrp } from '../ledger/drops'
 import { MAX_NAME_LENGTH, READY_TO_ASSIGN, type Category } from '../ledger/ledger'
 
-// The rules the Add, Move and Delete pop-ups apply before anything reaches the ledger.
+// The rules the pop-ups apply before anything reaches the ledger.
 // The ledger enforces the same limits again on Save, so these only decide what the screen allows.
 
 export type NameProblem = 'blank' | 'duplicate' | 'tooLong'
@@ -21,14 +21,17 @@ export const canMoveFrom = (category: Category, to?: string) => category.balance
 /** Any category can receive XRP except the one it comes from. */
 export const canMoveTo = (category: Category, from?: string) => category.id !== from
 
+/** Spending needs a category that holds some XRP, and never Ready to Assign. */
+export const canSpendFrom = (category: Category) => category.id !== READY_TO_ASSIGN && category.balance > 0n
+
 /** Every category except Ready to Assign can be deleted. */
 export const canDelete = (category: Category) => category.id !== READY_TO_ASSIGN
 
 export type AmountCheck = { drops: bigint; problem?: undefined } | { drops?: undefined; problem: string }
 
 /**
- * Checks a typed move amount: above zero, at most 6 decimal places, and no more than the From balance.
- * Only "more than the From balance" carries a message for the screen; any other problem just keeps Save dull.
+ * Checks a typed amount: above zero, at most 6 decimal places, and no more than the From balance
+ * (a deposit has no From, so no upper limit). Only "more than the From balance" carries a message for the screen; any other problem just keeps Save dull.
  */
 export function checkAmount(input: string, from?: Category): AmountCheck {
   const drops = parseXrp(input)

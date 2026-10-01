@@ -99,7 +99,7 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
         onName={name => edit({ kind: 'add', name })}
         onSaveName={save}
       />
-      <BudgetActions dull={mode !== null} />
+      <BudgetActions blocked={blocked} onStart={edit} />
       <Filters />
       <CoinWheel />
       <BossButton />
