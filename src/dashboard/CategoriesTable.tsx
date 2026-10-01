@@ -54,8 +54,8 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {c.id === READY_TO_ASSIGN && <small>deposits land here</small>}
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
-                      <td>{formatXrp(c.balance)}</td>
                       <td>$0.00</td>
+                      <td>{formatXrp(c.balance)}</td>
                     </tr>
                   )
                 })
@@ -84,8 +84,8 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                       onKeyDown={e => e.key === 'Enter' && onSaveName()}
                     />
                   </td>
-                  <td>0</td>
                   <td>$0.00</td>
+                  <td>0</td>
                 </tr>
               )}
             </tbody>
@@ -93,8 +93,8 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
         </div>
         <div className="tfoot">
           <div className="c1">category</div>
-          <div className="c2">XRP</div>
-          <div className="c3">USD</div>
+          <div className="c2">USD</div>
+          <div className="c3">XRP</div>
         </div>
       </section>
       <div id="tblArrowC" className="comp">

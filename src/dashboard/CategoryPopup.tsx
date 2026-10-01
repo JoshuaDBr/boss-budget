@@ -99,6 +99,9 @@ function MoveFields({ mode, fromName, toName, problem, ready, onChange, onSave }
   return (
     <div className="popGrid">
       <Field label="from" value={fromName} active={mode.active === 'from'} onFocus={() => activate('from')} />
+      <div className="fld num usd" aria-label="US dollars (not available yet)">
+        $0.00
+      </div>
       <label className={`fld num amt${mode.active === 'amount' ? ' on' : ''}${problem ? ' bad' : ''}`}>
         <input
           ref={amountBox}
@@ -111,9 +114,6 @@ function MoveFields({ mode, fromName, toName, problem, ready, onChange, onSave }
           onKeyDown={e => e.key === 'Enter' && ready && onSave()}
         />
       </label>
-      <div className="fld num usd" aria-label="US dollars (not available yet)">
-        $0.00
-      </div>
       <Field label="to" value={toName} active={mode.active === 'to'} onFocus={() => activate('to')} />
     </div>
   )
