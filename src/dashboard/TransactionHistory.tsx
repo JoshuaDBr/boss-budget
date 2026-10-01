@@ -16,8 +16,8 @@ export default function TransactionHistory() {
                     <path d="M1 6 q3 -6 6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0 t6 0" fill="none" stroke="#bbb" strokeWidth="1.4" />
                   </svg>
                 </td>
-                <td className="num muted">— XRP</td>
                 <td className="num muted">$0.00</td>
+                <td className="num muted">— XRP</td>
               </tr>
             ))}
           </tbody>
