@@ -1,15 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { READY_TO_ASSIGN, deposit, move, snapshot, starterBudget } from './ledger'
-import { STORAGE_KEY, StorageError, type KeyValueStore, deserialize, load, save, serialize } from './storage'
+import { STORAGE_KEY, StorageError, V1_STORAGE_KEY, type KeyValueStore, deserialize, load, save, serialize } from './storage'
 
 const memoryStore = (initial: Record<string, string> = {}): KeyValueStore & { data: Record<string, string> } => {
   const data = { ...initial }
-  return { data, getItem: (k) => data[k] ?? null, setItem: (k, v) => void (data[k] = v) }
+  return {
+    data,
+    getItem: (k) => data[k] ?? null,
+    setItem: (k, v) => void (data[k] = v),
+    removeItem: (k) => void delete data[k],
+  }
 }
 
 describe('storage', () => {
   it('starts with the starter budget when nothing is saved', () => {
     expect(snapshot(load(memoryStore())).categories).toHaveLength(4)
+  })
+
+  it('deletes the XRP budget saved by V1 and starts fresh', () => {
+    const v1 = serialize(deposit(starterBudget(), 5n)).replace('"version":2', '"version":1')
+    const store = memoryStore({ [V1_STORAGE_KEY]: v1 })
+    expect(load(store)).toEqual(starterBudget())
+    expect(store.data).not.toHaveProperty(V1_STORAGE_KEY)
   })
 
   it('round-trips a budget exactly, including very large amounts', () => {
@@ -23,7 +35,7 @@ describe('storage', () => {
   it('refuses damaged or tampered data instead of loading it', () => {
     const tampered = JSON.parse(serialize(deposit(starterBudget(), 5n)))
     tampered.entries.push({ kind: 'spend', from: READY_TO_ASSIGN, amount: '5' })
-    for (const text of ['not json', '{"version":2,"entries":[]}', JSON.stringify(tampered)]) {
+    for (const text of ['not json', '{"version":1,"entries":[]}', JSON.stringify(tampered)]) {
       expect(() => deserialize(text)).toThrow(StorageError)
     }
     const badAmount = serialize(deposit(starterBudget(), 5n)).replace('"5"', '"-5"')

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { formatXmr, formatXmrShort, parseXmr } from '../ledger/piconero'
 import type { Snapshot } from '../ledger/ledger'
 import type { DepositMode, Mode, MoveField, MoveMode, SpendMode } from './categoryMode'
 import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
@@ -17,7 +18,7 @@ interface Props {
   onCancel: () => void
 }
 
-const LABELS = { add: 'Add a category', move: 'Move XRP', delete: 'Delete a category', deposit: 'Deposit XRP', spend: 'Spend XRP' }
+const LABELS = { add: 'Add a category', move: 'Move XMR', delete: 'Delete a category', deposit: 'Deposit XMR', spend: 'Spend XMR' }
 
 /** The pop-ups that show their name as a title. */
 const TITLED = new Set<Mode['kind']>(['add', 'deposit', 'spend'])
@@ -104,32 +105,23 @@ interface MoveProps {
 }
 
 function MoveFields({ mode, fromName, toName, problem, ready, onChange, onSave }: MoveProps) {
-  const amountBox = useRef<HTMLInputElement>(null)
   const activate = (active: MoveField) => mode.active !== active && onChange({ ...mode, active })
-
-  // When the emphasis reaches the amount, so does the typing focus.
-  useEffect(() => {
-    if (mode.active === 'amount') amountBox.current?.focus()
-  }, [mode.active])
 
   return (
     <div className="popGrid">
       <Field label="From" value={fromName} active={mode.active === 'from'} onFocus={() => activate('from')} />
       <div className="fld num usd" aria-label="US dollars (not available yet)">
-        $0.00
+        $-,--
       </div>
-      <label className={`fld num amt${mode.active === 'amount' ? ' on' : ''}${problem ? ' bad' : ''}`}>
-        <input
-          ref={amountBox}
-          aria-label="XRP to move"
-          inputMode="decimal"
-          autoComplete="off"
-          value={mode.amount}
-          onFocus={() => activate('amount')}
-          onChange={e => onChange({ ...mode, amount: e.target.value })}
-          onKeyDown={e => e.key === 'Enter' && ready && onSave()}
-        />
-      </label>
+      <AmountBox
+        label="XMR to move"
+        value={mode.amount}
+        active={mode.active === 'amount'}
+        problem={problem}
+        onActivate={() => activate('amount')}
+        onChange={amount => onChange({ ...mode, amount })}
+        onEnter={() => ready && onSave()}
+      />
       <Field label="To" value={toName} active={mode.active === 'to'} onFocus={() => activate('to')} />
     </div>
   )
@@ -145,17 +137,11 @@ interface MoneyProps {
 }
 
 /**
- * Spend: From, USD and XRP, then Note and Date. Deposit: USD and XRP (under their columns), then Note and Date.
+ * Spend: From, USD and XMR, then Note and Date. Deposit: USD and XMR (under their columns), then Note and Date.
  * Note and Date are placeholders in this stage and cannot be used yet.
  */
 function MoneyFields({ mode, fromName, problem, ready, onChange, onSave }: MoneyProps) {
-  const amountBox = useRef<HTMLInputElement>(null)
   const amountActive = mode.kind === 'deposit' || mode.active === 'amount'
-
-  // A deposit opens with the cursor in the amount; a spend moves it there once From is chosen.
-  useEffect(() => {
-    if (amountActive) amountBox.current?.focus()
-  }, [amountActive])
 
   return (
     <div className="popGrid">
@@ -165,23 +151,84 @@ function MoneyFields({ mode, fromName, problem, ready, onChange, onSave }: Money
         <div />
       )}
       <div className="fld num usd" aria-label="US dollars (not available yet)">
-        $0.00
+        $-,--
       </div>
-      <label className={`fld num amt${amountActive ? ' on' : ''}${problem ? ' bad' : ''}`}>
-        <input
-          ref={amountBox}
-          aria-label={mode.kind === 'deposit' ? 'XRP to deposit' : 'XRP to spend'}
-          inputMode="decimal"
-          autoComplete="off"
-          value={mode.amount}
-          onFocus={() => mode.kind === 'spend' && mode.active !== 'amount' && onChange({ ...mode, active: 'amount' })}
-          onChange={e => onChange({ ...mode, amount: e.target.value })}
-          onKeyDown={e => e.key === 'Enter' && ready && onSave()}
-        />
-      </label>
+      <AmountBox
+        label={mode.kind === 'deposit' ? 'XMR to deposit' : 'XMR to spend'}
+        value={mode.amount}
+        active={amountActive}
+        problem={problem}
+        onActivate={() => mode.kind === 'spend' && mode.active !== 'amount' && onChange({ ...mode, active: 'amount' })}
+        onChange={amount => onChange({ ...mode, amount })}
+        onEnter={() => ready && onSave()}
+      />
       <Placeholder label="Note" />
       <Placeholder label="Date" wide />
     </div>
+  )
+}
+
+interface AmountProps {
+  label: string
+  value: string
+  active: boolean
+  problem?: string
+  onActivate: () => void
+  onChange: (value: string) => void
+  onEnter: () => void
+}
+
+/**
+ * The XMR amount. The box in the row shows four decimal places, cut. Typing happens in a full box laid over the
+ * entry line, which opens whenever the amount gets the cursor and shows all twelve. On leaving it, a valid amount is
+ * written out to twelve places, so digits past the fourth read as zeros until changed.
+ */
+function AmountBox({ label, value, active, problem, onActivate, onChange, onEnter }: AmountProps) {
+  const [open, setOpen] = useState(active)
+  const fullBox = useRef<HTMLInputElement>(null)
+  const piconero = parseXmr(value)
+
+  // When the emphasis reaches the amount, the full box opens with the cursor in it.
+  useEffect(() => {
+    if (active) setOpen(true)
+  }, [active])
+  useEffect(() => {
+    if (open) fullBox.current?.focus()
+  }, [open])
+
+  const close = () => {
+    setOpen(false)
+    if (piconero !== null) onChange(formatXmr(piconero))
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`fld num amt${active ? ' on' : ''}${problem ? ' bad' : ''}`}
+        aria-label={label}
+        onClick={() => {
+          onActivate()
+          setOpen(true)
+        }}
+      >
+        {piconero === null ? value : formatXmrShort(piconero)}
+      </button>
+      {open && active && (
+        <label className={problem ? 'fullAmt bad' : 'fullAmt'}>
+          <input
+            ref={fullBox}
+            aria-label={label}
+            inputMode="decimal"
+            autoComplete="off"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            onBlur={close}
+            onKeyDown={e => e.key === 'Enter' && onEnter()}
+          />
+        </label>
+      )}
+    </>
   )
 }
 

@@ -6,7 +6,7 @@ import { startAdd, startDelete, startMove } from './categoryMode'
 // Icons are drawn as SVG so they do not depend on the fonts installed.
 const ACTIONS = [
   { label: 'Add', title: 'Add a category', icon: 'M8 3 V13 M3 8 H13', start: startAdd },
-  { label: 'Move', title: 'Move XRP between categories', icon: 'M5 13 V3 M2.5 5.5 L5 3 L7.5 5.5 M11 3 V13 M8.5 10.5 L11 13 L13.5 10.5', start: startMove },
+  { label: 'Move', title: 'Move XMR between categories', icon: 'M5 13 V3 M2.5 5.5 L5 3 L7.5 5.5 M11 3 V13 M8.5 10.5 L11 13 L13.5 10.5', start: startMove },
   { label: 'Delete', title: 'Delete a category', icon: 'M3 8 H13', start: startDelete },
 ]
 

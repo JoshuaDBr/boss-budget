@@ -61,23 +61,23 @@ export function pendingChange(mode: Mode, categories: readonly Category[]): ((bu
     case 'move': {
       const from = categories.find(c => c.id === mode.from)
       const to = categories.find(c => c.id === mode.to)
-      const { drops } = checkAmount(mode.amount, from)
-      if (!from || !to || drops === undefined) return null
-      return budget => move(budget, from.id, to.id, drops)
+      const { piconero } = checkAmount(mode.amount, from)
+      if (!from || !to || piconero === undefined) return null
+      return budget => move(budget, from.id, to.id, piconero)
     }
     case 'delete': {
       const category = categories.find(c => c.id === mode.id)
       return category && canDelete(category) ? budget => deleteCategory(budget, category.id) : null
     }
     case 'deposit': {
-      const { drops } = checkAmount(mode.amount)
-      return drops === undefined ? null : budget => deposit(budget, drops)
+      const { piconero } = checkAmount(mode.amount)
+      return piconero === undefined ? null : budget => deposit(budget, piconero)
     }
     case 'spend': {
       const from = categories.find(c => c.id === mode.from)
-      const { drops } = checkAmount(mode.amount, from)
-      if (!from || !canSpendFrom(from) || drops === undefined) return null
-      return budget => spend(budget, from.id, drops)
+      const { piconero } = checkAmount(mode.amount, from)
+      if (!from || !canSpendFrom(from) || piconero === undefined) return null
+      return budget => spend(budget, from.id, piconero)
     }
   }
 }

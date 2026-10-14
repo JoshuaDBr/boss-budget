@@ -5,8 +5,8 @@ import { startDeposit, startSpend } from './categoryMode'
 // Absolutely positioned in the gap under the box, so nothing else moves.
 // Dulled while a pop-up is open.
 const ACTIONS = [
-  { label: 'Deposit', title: 'Deposit XRP', start: startDeposit },
-  { label: 'Spend', title: 'Spend XRP', start: startSpend },
+  { label: 'Deposit', title: 'Deposit XMR', start: startDeposit },
+  { label: 'Spend', title: 'Spend XMR', start: startSpend },
 ]
 
 interface Props {

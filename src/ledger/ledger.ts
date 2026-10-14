@@ -1,4 +1,4 @@
-import { formatXrp } from './drops'
+import { formatXmr } from './piconero'
 
 // The budget is an append-only list of entries. Balances are never stored or
 // edited directly; they are recalculated by replaying the entries in order.
@@ -61,7 +61,7 @@ export function snapshot(budget: Budget): Snapshot {
   const take = (category: Category, amount: bigint) => {
     if (category.balance < amount) {
       throw new BudgetError(
-        `${category.name} holds ${formatXrp(category.balance)} XRP, which is less than ${formatXrp(amount)} XRP`,
+        `${category.name} holds ${formatXmr(category.balance)} XMR, which is less than ${formatXmr(amount)} XMR`,
       )
     }
     category.balance -= amount
@@ -134,7 +134,7 @@ export function checkGuardrail({ categories, total }: Snapshot): void {
     sum += category.balance
   }
   if (sum !== total) {
-    throw new BudgetError(`Guardrail broken: categories add up to ${sum} drops, but the total is ${total}`)
+    throw new BudgetError(`Guardrail broken: categories add up to ${sum} piconero, but the total is ${total}`)
   }
 }
 

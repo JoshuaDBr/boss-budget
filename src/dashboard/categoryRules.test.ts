@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { READY_TO_ASSIGN, type Category } from '../ledger/ledger'
 import { canDelete, canMoveFrom, canMoveTo, checkAmount, deleteMessage, nameProblem } from './categoryRules'
 
-const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000n }
-const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_500_000n }
+const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000_000_000n }
+const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_500_000_000_000n }
 const gas: Category = { id: 'gas', name: 'Gas', balance: 0n }
 const all = [ready, groceries, gas]
 
@@ -24,7 +24,7 @@ describe('new category names', () => {
 })
 
 describe('move eligibility', () => {
-  it('needs XRP in the From category, and From cannot also be To', () => {
+  it('needs XMR in the From category, and From cannot also be To', () => {
     expect(canMoveFrom(groceries)).toBe(true)
     expect(canMoveFrom(gas)).toBe(false)
     expect(canMoveFrom(ready)).toBe(true)
@@ -36,17 +36,17 @@ describe('move eligibility', () => {
 })
 
 describe('move amounts', () => {
-  it('are accepted when above 0, at most 6 decimals and within the From balance', () => {
-    expect(checkAmount('12.5', groceries)).toEqual({ drops: 12_500_000n })
-    expect(checkAmount('0.000001', groceries)).toEqual({ drops: 1n })
-    expect(checkAmount(' 3 ', ready)).toEqual({ drops: 3_000_000n })
+  it('are accepted when above 0, at most 12 decimals and within the From balance', () => {
+    expect(checkAmount('12.5', groceries)).toEqual({ piconero: 12_500_000_000_000n })
+    expect(checkAmount('0.000000000001', groceries)).toEqual({ piconero: 1n })
+    expect(checkAmount(' 3 ', ready)).toEqual({ piconero: 3_000_000_000_000n })
   })
 
   it('are refused otherwise, explaining only a shortfall in the From category', () => {
-    for (const input of ['', '0', '0.000000', '1.0000001', '-1', 'abc']) {
+    for (const input of ['', '0', '0.000000000000', '1.0000000000001', '-1', 'abc']) {
       expect(checkAmount(input, groceries)).toEqual({ problem: '' })
     }
-    expect(checkAmount('12.500001', groceries).problem).toBe('Groceries holds only 12.5 XRP')
+    expect(checkAmount('12.500000000001', groceries).problem).toBe('Groceries holds only 12.500000000000 XMR')
   })
 })
 
@@ -56,9 +56,9 @@ describe('delete', () => {
     expect(canDelete(gas)).toBe(true)
   })
 
-  it('warns how much XRP returns to Ready to Assign, leaving that sentence out at 0 XRP', () => {
+  it('warns how much XMR returns to Ready to Assign, leaving that sentence out at 0 XMR', () => {
     expect(deleteMessage(groceries)).toBe(
-      'Are you sure that you want to delete Groceries? 12.5 XRP will be moved to Ready to Assign, and past transactions may become unassigned.',
+      'Are you sure that you want to delete Groceries? 12.500000000000 XMR will be moved to Ready to Assign, and past transactions may become unassigned.',
     )
     expect(deleteMessage(gas)).toBe('Are you sure that you want to delete Gas? Past transactions may become unassigned.')
   })

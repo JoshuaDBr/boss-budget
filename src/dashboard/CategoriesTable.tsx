@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { formatXrp } from '../ledger/drops'
+import { formatXmr } from '../ledger/piconero'
 import { MAX_NAME_LENGTH, READY_TO_ASSIGN, type Category } from '../ledger/ledger'
 import type { BudgetState } from '../useBudget'
 import { isChoosable, type Mode } from './categoryMode'
@@ -55,8 +55,8 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {c.id === READY_TO_ASSIGN && <small>deposits land here</small>}
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
-                      <td>$0.00</td>
-                      <td>{formatXrp(c.balance)}</td>
+                      <td>$-,--</td>
+                      <td>{formatXmr(c.balance)}</td>
                     </tr>
                   )
                 })
@@ -85,7 +85,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                       onKeyDown={e => e.key === 'Enter' && onSaveName()}
                     />
                   </td>
-                  <td>$0.00</td>
+                  <td>$-,--</td>
                   <td>0</td>
                 </tr>
               )}
@@ -95,7 +95,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
         <div className="tfoot">
           <div className="c1">category</div>
           <div className="c2">USD</div>
-          <div className="c3">XRP</div>
+          <div className="c3">XMR</div>
         </div>
       </section>
       <div id="tblArrowC" className="comp">

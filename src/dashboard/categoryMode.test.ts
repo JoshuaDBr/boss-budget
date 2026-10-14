@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { READY_TO_ASSIGN, deposit, move, snapshot, starterBudget, type Category } from '../ledger/ledger'
 import { choose, isChoosable, pendingChange, startAdd, startDelete, startDeposit, startMove, startSpend, type Mode } from './categoryMode'
 
-const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000n }
-const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_000_000n }
+const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000_000_000n }
+const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_000_000_000_000n }
 const gas: Category = { id: 'gas', name: 'Gas', balance: 0n }
 
 describe('move pop-up', () => {
@@ -16,7 +16,7 @@ describe('move pop-up', () => {
     expect(mode).toMatchObject({ from: 'g', to: READY_TO_ASSIGN, active: 'amount' })
   })
 
-  it('ignores categories with 0 XRP as From, and the From category as To', () => {
+  it('ignores categories with 0 XMR as From, and the From category as To', () => {
     const start = startMove()
     expect(isChoosable(start, gas)).toBe(false)
     expect(choose(start, gas)).toBe(start)
@@ -51,7 +51,7 @@ describe('delete pop-up', () => {
 })
 
 describe('spend pop-up', () => {
-  it('chooses only categories that hold XRP, never Ready to Assign, then moves to the amount', () => {
+  it('chooses only categories that hold XMR, never Ready to Assign, then moves to the amount', () => {
     const start = startSpend()
     expect(isChoosable(start, ready)).toBe(false)
     expect(isChoosable(start, gas)).toBe(false)
@@ -76,7 +76,7 @@ describe('add pop-up', () => {
 })
 
 describe('Save', () => {
-  const funded = move(deposit(starterBudget(), 10_000_000n), READY_TO_ASSIGN, 'starter-1', 4_000_000n)
+  const funded = move(deposit(starterBudget(), 10_000_000_000_000n), READY_TO_ASSIGN, 'starter-1', 4_000_000_000_000n)
   const categories = snapshot(funded).categories
   const after = (mode: Mode) => {
     const change = pendingChange(mode, categories)
@@ -87,32 +87,32 @@ describe('Save', () => {
     expect(pendingChange(startAdd(), categories)).toBeNull()
     expect(pendingChange({ kind: 'add', name: 'gas' }, categories)).toBeNull()
     expect(pendingChange({ ...startMove(), from: 'starter-1', amount: '1' }, categories)).toBeNull()
-    expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '4.000001' }, categories)).toBeNull()
+    expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '4.000000000001' }, categories)).toBeNull()
     expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '0' }, categories)).toBeNull()
     expect(pendingChange(startDelete(), categories)).toBeNull()
     expect(pendingChange({ kind: 'delete', id: READY_TO_ASSIGN }, categories)).toBeNull()
     expect(pendingChange(startDeposit(), categories)).toBeNull()
-    expect(pendingChange({ kind: 'deposit', amount: '1.0000001' }, categories)).toBeNull()
+    expect(pendingChange({ kind: 'deposit', amount: '1.0000000000001' }, categories)).toBeNull()
     expect(pendingChange({ ...startSpend(), amount: '1' }, categories)).toBeNull()
-    expect(pendingChange({ kind: 'spend', from: 'starter-1', amount: '4.000001', active: 'amount' }, categories)).toBeNull()
+    expect(pendingChange({ kind: 'spend', from: 'starter-1', amount: '4.000000000001', active: 'amount' }, categories)).toBeNull()
     expect(pendingChange({ kind: 'spend', from: READY_TO_ASSIGN, amount: '1', active: 'amount' }, categories)).toBeNull()
   })
 
   it('adds, moves and deletes through the ledger', () => {
     expect(after({ kind: 'add', name: ' Rent ' })?.at(-1)).toBe('Rent 0')
     expect(after({ kind: 'move', from: 'starter-1', to: 'starter-3', amount: '4', active: 'amount' })).toEqual([
-      'Ready to Assign 6000000',
+      'Ready to Assign 6000000000000',
       'Groceries 0',
       'Gas 0',
-      'Emergency 4000000',
+      'Emergency 4000000000000',
     ])
-    expect(after({ kind: 'delete', id: 'starter-1' })).toEqual(['Ready to Assign 10000000', 'Gas 0', 'Emergency 0'])
+    expect(after({ kind: 'delete', id: 'starter-1' })).toEqual(['Ready to Assign 10000000000000', 'Gas 0', 'Emergency 0'])
   })
 
   it('deposits into Ready to Assign with no upper limit, and spends from a category', () => {
-    expect(after({ kind: 'deposit', amount: '1000000000.5' })?.[0]).toBe('Ready to Assign 1000000006500000')
+    expect(after({ kind: 'deposit', amount: '1000000000.5' })?.[0]).toBe('Ready to Assign 1000000006500000000000')
     expect(after({ kind: 'spend', from: 'starter-1', amount: '4', active: 'amount' })).toEqual([
-      'Ready to Assign 6000000',
+      'Ready to Assign 6000000000000',
       'Groceries 0',
       'Gas 0',
       'Emergency 0',

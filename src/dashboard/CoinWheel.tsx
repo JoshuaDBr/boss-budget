@@ -1,9 +1,9 @@
 import { OUT_OF_SCOPE, placeholder } from './placeholder'
 
-// Placeholder coin wheel (the approved "wheel 1" lens). V1 tracks XRP only, so XRP
+// Placeholder coin wheel (the approved "wheel 1" lens). V2 tracks XMR only, so XMR
 // sits in the centre and the wheel does not turn.
 const COINS = ['AAA', 'XMR', 'SOL', 'XRP', 'BTC', 'ECH', 'ETH', 'BCH']
-const ACTIVE = COINS.indexOf('XRP')
+const ACTIVE = COINS.indexOf('XMR')
 
 // A shallow lens tilted toward the viewer. t runs across it from -1 to 1; u = 1 - t².
 const CX = 280, HW = 266, HUB_Y = 146, TAB_STEP = 0.4
@@ -55,7 +55,7 @@ export default function CoinWheel() {
           if (Math.abs(d) > 2) return null
           return (
             <button key={coin} className={`tab${d === 0 ? ' act' : ''}`} style={{ transform: tabTransform(d) }}
-              aria-pressed={d === 0} {...placeholder(d === 0 ? 'XRP is the only coin in version 1' : OUT_OF_SCOPE)}>
+              aria-pressed={d === 0} {...placeholder(d === 0 ? 'XMR is the only coin in version 2' : OUT_OF_SCOPE)}>
               {coin}
             </button>
           )
