@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { READY_TO_ASSIGN, deposit, move, snapshot, starterBudget, type Category } from '../ledger/ledger'
-import { choose, isChoosable, pendingChange, startAdd, startDelete, startDeposit, startMove, startSpend, type Mode } from './categoryMode'
+import { isoToDigits, todayIso } from '../ledger/dates'
+import { READY_TO_ASSIGN, deleteCategory, deposit, move, snapshot, spend, starterBudget, type Category } from '../ledger/ledger'
+import {
+  choose,
+  confirmsSave,
+  deleteChange,
+  entryDate,
+  isChoosable,
+  pendingChange,
+  startAdd,
+  startDelete,
+  startDeposit,
+  startEdit,
+  startMove,
+  startSpend,
+  type Mode,
+} from './categoryMode'
 
 const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000_000_000n }
 const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_000_000_000_000n }
@@ -92,10 +107,10 @@ describe('Save', () => {
     expect(pendingChange(startDelete(), categories)).toBeNull()
     expect(pendingChange({ kind: 'delete', id: READY_TO_ASSIGN }, categories)).toBeNull()
     expect(pendingChange(startDeposit(), categories)).toBeNull()
-    expect(pendingChange({ kind: 'deposit', amount: '1.0000000000001' }, categories)).toBeNull()
+    expect(pendingChange({ ...startDeposit(), amount: '1.0000000000001' }, categories)).toBeNull()
     expect(pendingChange({ ...startSpend(), amount: '1' }, categories)).toBeNull()
-    expect(pendingChange({ kind: 'spend', from: 'starter-1', amount: '4.000000000001', active: 'amount' }, categories)).toBeNull()
-    expect(pendingChange({ kind: 'spend', from: READY_TO_ASSIGN, amount: '1', active: 'amount' }, categories)).toBeNull()
+    expect(pendingChange({ ...startSpend(), from: 'starter-1', amount: '4.000000000001', active: 'amount' }, categories)).toBeNull()
+    expect(pendingChange({ ...startSpend(), from: READY_TO_ASSIGN, amount: '1', active: 'amount' }, categories)).toBeNull()
   })
 
   it('adds, moves and deletes through the ledger', () => {
@@ -110,12 +125,80 @@ describe('Save', () => {
   })
 
   it('deposits into Ready to Assign with no upper limit, and spends from a category', () => {
-    expect(after({ kind: 'deposit', amount: '1000000000.5' })?.[0]).toBe('Ready to Assign 1000000006500000000000')
-    expect(after({ kind: 'spend', from: 'starter-1', amount: '4', active: 'amount' })).toEqual([
+    expect(after({ ...startDeposit(), amount: '1000000000.5' })?.[0]).toBe('Ready to Assign 1000000006500000000000')
+    expect(after({ ...startSpend(), from: 'starter-1', amount: '4', active: 'amount' })).toEqual([
       'Ready to Assign 6000000000000',
       'Groceries 0',
       'Gas 0',
       'Emergency 0',
     ])
+  })
+})
+
+describe('Note and Date', () => {
+  it('start with an empty note and today prefilled', () => {
+    expect(startDeposit()).toMatchObject({ note: '', date: isoToDigits(todayIso()) })
+    expect(startSpend()).toMatchObject({ note: '', date: isoToDigits(todayIso()) })
+  })
+
+  it('accept only a real date that is today or earlier', () => {
+    expect(entryDate('10142026', '2026-10-14')).toBe('2026-10-14')
+    expect(entryDate('10152026', '2026-10-14')).toBeNull()
+    expect(entryDate('02302026', '2026-10-14')).toBeNull()
+    expect(entryDate('1014202', '2026-10-14')).toBeNull()
+  })
+
+  it('are recorded with the transaction, and keep Save dull while the date is unfinished', () => {
+    const budget = starterBudget()
+    const categories = snapshot(budget).categories
+    expect(pendingChange({ ...startDeposit(), amount: '1', date: '1014' }, categories)).toBeNull()
+    const change = pendingChange({ ...startDeposit(), amount: '1', note: ' Paycheck ', date: '10012026' }, categories)
+    expect(snapshot(change!(budget)).transactions[0]).toMatchObject({ note: 'Paycheck', date: '2026-10-01' })
+  })
+})
+
+describe('confirmation', () => {
+  it('applies to Deposit, Spend and edits only', () => {
+    expect([startAdd(), startMove(), startDelete(), startDeposit(), startSpend()].map(confirmsSave)).toEqual([false, false, false, true, true])
+  })
+})
+
+describe('edit pop-up', () => {
+  const funded = spend(
+    move(deposit(starterBudget(), 10n, { note: 'Pay', date: '2026-10-01' }, 'd1'), READY_TO_ASSIGN, 'starter-1', 4n),
+    'starter-1',
+    3n,
+    { note: 'Tacos', date: '2026-10-02' },
+    's1',
+  )
+  const { categories, transactions } = snapshot(funded)
+  const balancesAfter = (mode: Mode, budget = funded) => {
+    const change = pendingChange(mode, snapshot(budget).categories)
+    return change && snapshot(change(budget)).categories.map(c => c.balance)
+  }
+
+  it('opens filled with the current values and nothing emphasized', () => {
+    expect(startEdit(transactions[1], '0.000000000003')).toEqual({
+      kind: 'edit', id: 's1', spend: true, from: 'starter-1', amount: '0.000000000003', note: 'Tacos', date: '10022026', active: null, listOpen: false,
+    })
+  })
+
+  it('may move a spend to a category holding 0 XMR and leave it negative, but never to Ready to Assign', () => {
+    const edit = startEdit(transactions[1], '0.000000000005')
+    expect(balancesAfter({ ...edit, from: 'starter-2' })).toEqual([6n, 4n, -5n, 0n])
+    expect(pendingChange({ ...edit, from: READY_TO_ASSIGN }, categories)).toBeNull()
+  })
+
+  it('keeps Save dull for an unassigned spend until a category is chosen', () => {
+    const orphaned = deleteCategory(funded, 'starter-1')
+    const edit = startEdit(snapshot(orphaned).transactions[1], '0.000000000003')
+    expect(pendingChange(edit, snapshot(orphaned).categories)).toBeNull()
+    expect(balancesAfter({ ...edit, from: 'starter-3' }, orphaned)).toEqual([10n, 0n, -3n])
+  })
+
+  it('edits a deposit without a category, and deletes', () => {
+    expect(balancesAfter(startEdit(transactions[0], '0.000000000001'))).toEqual([-3n, 1n, 0n, 0n])
+    const remove = deleteChange(startEdit(transactions[1], ''))
+    expect(snapshot(remove(funded)).categories.map(c => c.balance)).toEqual([6n, 4n, 0n, 0n])
   })
 })

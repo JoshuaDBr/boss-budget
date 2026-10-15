@@ -5,7 +5,9 @@ import {
   type Budget,
   addCategory,
   deleteCategory,
+  deleteTransaction,
   deposit,
+  editTransaction,
   move,
   snapshot,
   spend,
@@ -14,12 +16,15 @@ import {
 import { deserialize, serialize } from './storage'
 
 // Runs a long sequence of random operations, including many that should be refused,
+// along with edits and deletes of past deposits and spends, which may leave balances negative,
 // and checks the ledger against a separate, deliberately simple model after every step.
 // STRESS_OPS sets the count: 500 by default, 3,000 in the GitHub check.
 // STRESS_SEED makes a run repeatable; the seed is printed so any failure can be replayed.
 
 const OPS = Number(process.env.STRESS_OPS ?? 500)
 const SEED = Number(process.env.STRESS_SEED ?? 20260930)
+// Every step replays the whole ledger, so long runs need more than Vitest's default five seconds.
+const TIMEOUT_MS = 120_000
 
 function random(seed: number) {
   // mulberry32: small, fast and repeatable.
@@ -39,7 +44,7 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
   // Usually part or all of what the category holds; sometimes a random amount that may be too much.
   const amountFrom = (balance: bigint) => {
     const r = rand()
-    if (balance === 0n || r < 0.25) return amount()
+    if (balance <= 0n || r < 0.25) return amount()
     if (r < 0.4) return balance
     return (balance * BigInt(Math.floor(rand() * 1_000_000))) / 1_000_000n + 1n
   }
@@ -48,7 +53,17 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
   const model = new Map<string, bigint>([[READY_TO_ASSIGN, 0n], ['starter-1', 0n], ['starter-2', 0n], ['starter-3', 0n]])
   let total = 0n
   let nextId = 1
-  const counts = { accepted: 0, refused: 0 }
+  // The model's record of each transaction: a spend has a category, a deposit does not.
+  const records = new Map<string, { from?: string; amount: bigint }>()
+  const details = { note: '', date: '2026-10-14' }
+  // Adds a transaction's effect to the model, or takes it back out (sign -1n).
+  // A spend from a deleted category is taken back into Ready to Assign.
+  const affect = (t: { from?: string; amount: bigint }, sign: bigint) => {
+    const id = t.from === undefined ? READY_TO_ASSIGN : model.has(t.from) ? t.from : READY_TO_ASSIGN
+    model.set(id, model.get(id)! + (t.from === undefined ? sign : -sign) * t.amount)
+    total += (t.from === undefined ? sign : -sign) * t.amount
+  }
+  const counts = { accepted: 0, refused: 0, negative: 0 }
 
   for (let step = 1; step <= OPS; step++) {
     const ids = [...model.keys()]
@@ -58,11 +73,27 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
     let run: () => Budget
     let update = () => {}
 
-    if (roll < 0.2) {
+    if (roll < 0.17) {
       const a = amount()
+      const id = `t-${step}`
       expectOk = true
-      run = () => deposit(budget, a)
-      update = () => { model.set(READY_TO_ASSIGN, model.get(READY_TO_ASSIGN)! + a); total += a }
+      run = () => deposit(budget, a, details, id)
+      update = () => { affect({ amount: a }, 1n); records.set(id, { amount: a }) }
+    } else if (roll < 0.25 && records.size > 0) {
+      // Edit a past deposit or spend: new amount, and for a spend usually a new category.
+      const id = pick([...records.keys()])
+      const old = records.get(id)!
+      const a = amount()
+      const from = old.from === undefined ? undefined : rand() < 0.1 || others.length === 0 ? READY_TO_ASSIGN : pick(others)
+      const edited = { from, amount: a }
+      expectOk = from !== READY_TO_ASSIGN
+      run = () => editTransaction(budget, id, { ...edited, ...details })
+      update = () => { affect(old, -1n); affect(edited, 1n); records.set(id, edited) }
+    } else if (roll < 0.3 && records.size > 0) {
+      const id = rand() < 0.1 ? 'never-recorded' : pick([...records.keys()])
+      expectOk = records.has(id)
+      run = () => deleteTransaction(budget, id)
+      update = () => { affect(records.get(id)!, -1n); records.delete(id) }
     } else if (roll < 0.55) {
       const from = pick(ids)
       const to = rand() < 0.05 ? from : pick(ids)
@@ -73,9 +104,10 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
     } else if (roll < 0.85) {
       const from = rand() < 0.1 || others.length === 0 ? READY_TO_ASSIGN : pick(others)
       const a = amountFrom(model.get(from)!)
+      const id = `t-${step}`
       expectOk = from !== READY_TO_ASSIGN && model.get(from)! >= a
-      run = () => spend(budget, from, a)
-      update = () => { model.set(from, model.get(from)! - a); total -= a }
+      run = () => spend(budget, from, a, details, id)
+      update = () => { affect({ from, amount: a }, 1n); records.set(id, { from, amount: a }) }
     } else if (roll < 0.93 || others.length === 0) {
       const n = nextId++
       const id = `stress-${n}`
@@ -102,6 +134,7 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
     if (!expectOk) throw new Error(`Step ${step}: invalid operation was accepted`)
     update()
     counts.accepted++
+    if ([...model.values()].some((balance) => balance < 0n)) counts.negative++
 
     const snap = snapshot(budget)
     expect(snap.total, `step ${step} total`).toBe(total)
@@ -110,11 +143,18 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
     )
     expect(snap.categories.reduce((sum, c) => sum + c.balance, 0n), `step ${step} guardrail`).toBe(snap.total)
     expect(snap.categories[0].id).toBe(READY_TO_ASSIGN)
+    expect(Object.fromEntries(snap.transactions.map((t) => [t.id, t.amount])), `step ${step} transactions`).toEqual(
+      Object.fromEntries([...records].map(([id, t]) => [id, t.amount])),
+    )
 
     if (step % 100 === 0) expect(deserialize(serialize(budget)), `step ${step} save/load`).toEqual(budget)
   }
 
-  console.log(`Stress test: ${OPS} operations, ${counts.accepted} accepted, ${counts.refused} refused, seed ${SEED}`)
+  console.log(
+    `Stress test: ${OPS} operations, ${counts.accepted} accepted, ${counts.refused} refused, ` +
+      `${counts.negative} steps with a negative balance, seed ${SEED}`,
+  )
   expect(counts.accepted + counts.refused).toBe(OPS)
   expect(counts.refused).toBeGreaterThan(0)
-})
+  expect(counts.negative, 'some edits or deletes should leave a balance negative').toBeGreaterThan(0)
+}, TIMEOUT_MS)

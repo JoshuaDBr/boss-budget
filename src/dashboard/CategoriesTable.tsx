@@ -56,7 +56,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
                       <td>$-,--</td>
-                      <td>{formatXmr(c.balance)}</td>
+                      <td className={c.balance < 0n ? 'neg' : undefined}>{formatXmr(c.balance)}</td>
                     </tr>
                   )
                 })

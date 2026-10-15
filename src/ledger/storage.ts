@@ -1,10 +1,14 @@
+import { todayIso } from './dates'
 import { type Budget, type Entry, snapshot, starterBudget } from './ledger'
 
 // Saved in the browser (localStorage). No login, no server.
 // bigint amounts are written as decimal strings, since JSON has no bigint type.
 
 export const STORAGE_KEY = 'boss-budget:v2'
-const FORMAT_VERSION = 2
+const FORMAT_VERSION = 3
+// Version 2 (Phase 1) saved deposits and spends without an id, note or date. They are upgraded on load:
+// each gets an id, an empty note and the day of the upgrade, and the budget is saved again as version 3.
+const PHASE_1_VERSION = 2
 
 // Where V1 saved its XRP budget. V2 deletes it the first time it opens and starts fresh (V2 PRD, Phase 1).
 export const V1_STORAGE_KEY = 'boss-budget:v1'
@@ -29,16 +33,26 @@ export function serialize(budget: Budget): string {
 
 /** Parses saved data and replays it; throws StorageError if anything is malformed or breaks a rule. */
 export function deserialize(text: string): Budget {
+  return read(text).budget
+}
+
+function read(text: string): { budget: Budget; upgraded: boolean } {
   let data: { version?: unknown; entries?: unknown }
   try {
     data = JSON.parse(text)
   } catch {
     throw new StorageError('Saved budget is not valid JSON')
   }
-  if (data.version !== FORMAT_VERSION || !Array.isArray(data.entries)) {
+  const upgraded = data.version === PHASE_1_VERSION
+  if ((data.version !== FORMAT_VERSION && !upgraded) || !Array.isArray(data.entries)) {
     throw new StorageError('Saved budget has an unknown format')
   }
-  const entries = (data.entries as StoredEntry[]).map((entry) => {
+  const today = todayIso()
+  const entries = (data.entries as StoredEntry[]).map((stored, index) => {
+    const entry =
+      upgraded && (stored.kind === 'deposit' || stored.kind === 'spend')
+        ? { ...stored, id: `legacy-${index}`, note: '', date: today }
+        : stored
     if (entry.amount === undefined) return entry as Entry
     if (typeof entry.amount !== 'string' || !/^\d+$/.test(entry.amount)) {
       throw new StorageError('Saved budget contains an invalid amount')
@@ -51,7 +65,7 @@ export function deserialize(text: string): Budget {
   } catch (error) {
     throw new StorageError(`Saved budget failed its checks: ${(error as Error).message}`)
   }
-  return budget
+  return { budget, upgraded }
 }
 
 /**
@@ -62,7 +76,10 @@ export function deserialize(text: string): Budget {
 export function load(store: KeyValueStore): Budget {
   store.removeItem(V1_STORAGE_KEY)
   const text = store.getItem(STORAGE_KEY)
-  return text === null ? starterBudget() : deserialize(text)
+  if (text === null) return starterBudget()
+  const { budget, upgraded } = read(text)
+  if (upgraded) save(store, budget)
+  return budget
 }
 
 export function save(store: KeyValueStore, budget: Budget): void {

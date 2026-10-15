@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Category } from '../ledger/ledger'
+import type { Category, Transaction } from '../ledger/ledger'
+import { formatXmr } from '../ledger/piconero'
 import type { BudgetStore } from '../useBudget'
 import BossButton from './BossButton'
 import BudgetActions from './BudgetActions'
 import CategoriesTable from './CategoriesTable'
 import CategoryActions from './CategoryActions'
 import CategoryPopup from './CategoryPopup'
-import { choose, pendingChange, type Mode } from './categoryMode'
+import { choose, confirmsSave, deleteChange, pendingChange, startEdit, type Mode } from './categoryMode'
 import CoinWheel from './CoinWheel'
 import DayRangeWheel from './DayRangeWheel'
 import Filters from './Filters'
 import Holdings from './Holdings'
 import PriceChart from './PriceChart'
 import Refresh from './Refresh'
-import TransactionHistory from './TransactionHistory'
+import { Corner, HistoryTable } from './TransactionHistory'
 import './dashboard.css'
 
 // Desktop layout: a fixed 1280 x 800 stage. Every component is absolutely
@@ -22,17 +23,28 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
   const { state, update } = store
   const [mode, setMode] = useState<Mode | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Which view is in the central box. The other one shows in the corner.
+  const [view, setView] = useState<'budget' | 'history'>('budget')
 
   const change = mode && state.snapshot ? pendingChange(mode, state.snapshot.categories) : null
   const cancel = () => {
     setMode(null)
     setError(null)
   }
-  const save = () => {
-    if (!change) return
-    const refused = update(change)
+  const record = (apply: NonNullable<typeof change>) => {
+    const refused = update(apply)
     if (refused) setError(refused)
     else cancel()
+  }
+  // Deposit, Spend and edits ask first: Save shows the question, and Yes records.
+  const save = () => {
+    if (!mode || !change) return
+    if (confirmsSave(mode)) edit({ ...mode, confirm: 'save', ...(mode.kind === 'edit' && { listOpen: false }) })
+    else record(change)
+  }
+  const confirm = () => {
+    if (mode?.kind === 'edit' && mode.confirm === 'delete') record(deleteChange(mode))
+    else if (change) record(change)
   }
   const edit = (next: Mode) => {
     setMode(next)
@@ -78,11 +90,10 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
     }
   }, [adding])
 
+  const busy = mode ? 'Finish or cancel the open pop-up first' : null
   const blocked = state.error
     ? 'The saved budget could not be read, so it cannot be changed'
-    : mode
-      ? 'Finish or cancel the open pop-up first'
-      : null
+    : (busy ?? (view === 'history' ? 'Swap the budget back to the center first' : null))
 
   return (
     <main id="stage">
@@ -92,18 +103,26 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
       <DayRangeWheel />
       <Holdings total={state.snapshot?.total} />
       <CategoryActions blocked={blocked} onStart={edit} />
-      <CategoriesTable
-        budget={state}
-        mode={mode}
-        onChoose={(category: Category) => mode && edit(choose(mode, category))}
-        onName={name => edit({ kind: 'add', name })}
-        onSaveName={save}
-      />
+      {view === 'history' && state.snapshot ? (
+        <HistoryTable
+          snapshot={state.snapshot}
+          editable={!mode}
+          onEdit={(t: Transaction) => edit(startEdit(t, formatXmr(t.amount)))}
+        />
+      ) : (
+        <CategoriesTable
+          budget={state}
+          mode={mode}
+          onChoose={(category: Category) => mode && edit(choose(mode, category))}
+          onName={name => edit({ kind: 'add', name })}
+          onSaveName={save}
+        />
+      )}
       <BudgetActions blocked={blocked} onStart={edit} />
       <Filters />
       <CoinWheel />
       <BossButton />
-      <TransactionHistory />
+      <Corner snapshot={state.snapshot} view={view} blocked={state.error ?? busy} onSwap={() => setView(view === 'budget' ? 'history' : 'budget')} />
       {mode && state.snapshot && (
         <CategoryPopup
           snapshot={state.snapshot}
@@ -113,6 +132,7 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
           onChange={edit}
           onSave={save}
           onCancel={cancel}
+          onConfirm={confirm}
         />
       )}
     </main>

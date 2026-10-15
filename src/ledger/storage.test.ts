@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { todayIso } from './dates'
 import { READY_TO_ASSIGN, deposit, move, snapshot, starterBudget } from './ledger'
 import { STORAGE_KEY, StorageError, V1_STORAGE_KEY, type KeyValueStore, deserialize, load, save, serialize } from './storage'
 
@@ -46,5 +47,29 @@ describe('storage', () => {
     const store = memoryStore({ [STORAGE_KEY]: 'not json' })
     expect(() => load(store)).toThrow(StorageError)
     expect(store.data[STORAGE_KEY]).toBe('not json')
+  })
+})
+
+describe('upgrading a Phase 1 budget', () => {
+  it('gives old deposits and spends an id, an empty note and today, then saves it again', () => {
+    const phase1 = JSON.stringify({
+      version: 2,
+      entries: [
+        { kind: 'addCategory', id: READY_TO_ASSIGN, name: 'Ready to Assign' },
+        { kind: 'addCategory', id: 'food', name: 'Food' },
+        { kind: 'deposit', amount: '10' },
+        { kind: 'move', from: READY_TO_ASSIGN, to: 'food', amount: '6' },
+        { kind: 'spend', from: 'food', amount: '4' },
+      ],
+    })
+    const store = memoryStore({ [STORAGE_KEY]: phase1 })
+    const budget = load(store)
+    const today = todayIso()
+    expect(snapshot(budget).transactions).toEqual([
+      { id: 'legacy-2', kind: 'deposit', amount: 10n, note: '', date: today, order: 0 },
+      { id: 'legacy-4', kind: 'spend', from: 'food', amount: 4n, note: '', date: today, order: 1 },
+    ])
+    expect(JSON.parse(store.data[STORAGE_KEY]).version).toBe(3)
+    expect(load(store)).toEqual(budget)
   })
 })

@@ -4,7 +4,9 @@ import {
   READY_TO_ASSIGN,
   addCategory,
   deleteCategory,
+  deleteTransaction,
   deposit,
+  editTransaction,
   emptyBudget,
   move,
   snapshot,
@@ -121,6 +123,79 @@ describe('refused operations', () => {
 
 describe('replay checks', () => {
   it('reject entry lists that do not start with Ready to Assign', () => {
-    expect(() => snapshot({ entries: [{ kind: 'deposit', amount: 1n }] })).toThrow(BudgetError)
+    expect(() => snapshot({ entries: [{ kind: 'deposit', id: 'd', amount: 1n, note: '', date: '2026-10-14' }] })).toThrow(BudgetError)
+  })
+})
+
+describe('transaction records', () => {
+  const day = (date: string, note = '') => ({ note, date })
+  const funded = () => {
+    let budget = addCategory(emptyBudget(), 'Food', 'food')
+    budget = deposit(budget, 10n, day('2026-10-01', 'Paycheck'), 'd1')
+    budget = move(budget, READY_TO_ASSIGN, 'food', 6n)
+    return spend(budget, 'food', 4n, day('2026-10-02', 'Tacos'), 's1')
+  }
+
+  it('lists deposits and spends with their notes and dates, in order', () => {
+    const { transactions } = snapshot(funded())
+    expect(transactions.map((t) => [t.id, t.kind, t.amount, t.note, t.date, t.from])).toEqual([
+      ['d1', 'deposit', 10n, 'Paycheck', '2026-10-01', undefined],
+      ['s1', 'spend', 4n, 'Tacos', '2026-10-02', 'food'],
+    ])
+  })
+
+  it('edits a spend in place, which may leave a category negative', () => {
+    const budget = editTransaction(funded(), 's1', { from: 'food', amount: 9n, ...day('2026-10-03', 'Feast') })
+    expect(balances(budget)).toEqual({ 'Ready to Assign': 4n, Food: -3n })
+    const { transactions, total } = snapshot(budget)
+    expect(total).toBe(1n)
+    expect(transactions[1]).toMatchObject({ amount: 9n, note: 'Feast', date: '2026-10-03', order: 1 })
+  })
+
+  it('moves an edited spend to another category', () => {
+    let budget = addCategory(funded(), 'Fun', 'fun')
+    budget = editTransaction(budget, 's1', { from: 'fun', amount: 4n, ...day('2026-10-02') })
+    expect(balances(budget)).toEqual({ 'Ready to Assign': 4n, Food: 6n, Fun: -4n })
+  })
+
+  it('edits a deposit, which may leave Ready to Assign negative', () => {
+    const budget = editTransaction(funded(), 'd1', { amount: 1n, ...day('2026-10-01') })
+    expect(balances(budget)).toEqual({ 'Ready to Assign': -5n, Food: 2n })
+    expect(snapshot(budget).total).toBe(-3n)
+  })
+
+  it('deletes a spend and refunds its category', () => {
+    const budget = deleteTransaction(funded(), 's1')
+    expect(balances(budget)).toEqual({ 'Ready to Assign': 4n, Food: 6n })
+    expect(snapshot(budget).transactions.map((t) => t.id)).toEqual(['d1'])
+  })
+
+  it('deletes a deposit and takes it back out of Ready to Assign', () => {
+    const budget = deleteTransaction(funded(), 'd1')
+    expect(balances(budget)).toEqual({ 'Ready to Assign': -6n, Food: 2n })
+  })
+
+  it('leaves a spend from a deleted category unassigned, refunding to Ready to Assign', () => {
+    let budget = deleteCategory(funded(), 'food')
+    expect(snapshot(budget).transactions[1].from).toBe('food')
+    budget = deleteTransaction(budget, 's1')
+    expect(balances(budget)).toEqual({ 'Ready to Assign': 10n })
+  })
+
+  it('still refuses new spends and moves beyond what a category holds', () => {
+    const budget = editTransaction(funded(), 's1', { from: 'food', amount: 9n, ...day('2026-10-02') })
+    expect(() => spend(budget, 'food', 1n)).toThrow(BudgetError)
+    expect(() => move(budget, 'food', READY_TO_ASSIGN, 1n)).toThrow(BudgetError)
+  })
+
+  it('refuses bad edits', () => {
+    const budget = funded()
+    expect(() => editTransaction(budget, 'nope', { amount: 1n, ...day('2026-10-01') })).toThrow(BudgetError)
+    expect(() => editTransaction(budget, 'd1', { from: 'food', amount: 1n, ...day('2026-10-01') })).toThrow(BudgetError)
+    expect(() => editTransaction(budget, 's1', { amount: 1n, ...day('2026-10-01') })).toThrow(BudgetError)
+    expect(() => editTransaction(budget, 's1', { from: READY_TO_ASSIGN, amount: 1n, ...day('2026-10-01') })).toThrow(BudgetError)
+    expect(() => editTransaction(budget, 's1', { from: 'food', amount: 1n, ...day('2026-02-30') })).toThrow(BudgetError)
+    expect(() => editTransaction(budget, 's1', { from: 'food', amount: 1n, ...day('2026-10-01', 'x'.repeat(31)) })).toThrow(BudgetError)
+    expect(() => deleteTransaction(deleteTransaction(budget, 's1'), 's1')).toThrow(BudgetError)
   })
 })
