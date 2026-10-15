@@ -9,6 +9,9 @@ import { formatXmr, formatXmrShort } from '../ledger/piconero'
 export const newestFirst = (transactions: readonly Transaction[]) =>
   [...transactions].sort((a, b) => (a.date === b.date ? b.order - a.order : a.date < b.date ? 1 : -1))
 
+/** "+" before a deposit's XMR, "-" before a spend's. */
+const sign = (t: Transaction) => (t.kind === 'deposit' ? '+' : '-')
+
 /** A spend's category, or null if that category has been deleted. Deposits land in Ready to Assign. */
 const categoryOf = (t: Transaction, categories: readonly Category[]) => categories.find(c => c.id === t.from) ?? null
 
@@ -33,7 +36,7 @@ export function Corner({ snapshot, view, blocked, onSwap }: CornerProps) {
                     <td className="date">{isoToUs(t.date)}</td>
                     <td className="note">{t.note}</td>
                     <td className="usd muted">$-,--</td>
-                    <td className="num">{formatXmrShort(t.amount)}</td>
+                    <td className="num">{sign(t)}{formatXmrShort(t.amount)}</td>
                   </tr>
                 ))
               : snapshot?.categories.map(c => (
@@ -85,7 +88,7 @@ export function HistoryTable({ snapshot, editable, onEdit }: HistoryProps) {
                     {t.kind === 'deposit' ? 'Ready to Assign' : category ? category.name : <span className="unassigned">Unassigned</span>}
                   </td>
                   <td>$-,--</td>
-                  <td>{formatXmr(t.amount)}</td>
+                  <td>{sign(t)}{formatXmr(t.amount)}</td>
                 </tr>
               )
             })}
