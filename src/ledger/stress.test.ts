@@ -34,8 +34,8 @@ function random(seed: number) {
 it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => {
   const rand = random(SEED)
   const pick = <T,>(items: T[]) => items[Math.floor(rand() * items.length)]
-  // Amounts range from 1 drop to about 1,000 XRP.
-  const amount = () => BigInt(Math.floor(rand() ** 3 * 1_000_000_000) + 1)
+  // Amounts range from 1 piconero to about 1,000 XMR.
+  const amount = () => BigInt(Math.floor(rand() ** 3 * 1_000_000_000_000_000) + 1)
   // Usually part or all of what the category holds; sometimes a random amount that may be too much.
   const amountFrom = (balance: bigint) => {
     const r = rand()

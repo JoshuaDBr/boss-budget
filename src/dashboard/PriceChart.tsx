@@ -21,8 +21,8 @@ export default function PriceChart() {
           <text key={d.label} x={x(d.i)} y={H - 6} textAnchor="middle" fontSize="11" fill="#888">{d.label}</text>
         ))}
         <path d={line} fill="none" stroke="#bbb" strokeWidth="1.6" strokeDasharray="5 4" />
-        <text x="10" y="34" fontSize="28" fill="#333">XRP</text>
-        <text x="10" y="54" fontSize="11" fill="#888">$0.00</text>
+        <text x="10" y="34" fontSize="28" fill="#333">XMR</text>
+        <text x="10" y="54" fontSize="11" fill="#888">$-,--</text>
         <text x="10" y="72" fontSize="11" fill="#888">sample line</text>
         <text x="10" y="128" fontSize="24" fill="#333">USD</text>
       </svg>

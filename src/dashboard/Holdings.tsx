@@ -1,4 +1,4 @@
-import { formatXrp } from '../ledger/drops'
+import { formatXmrShort } from '../ledger/piconero'
 import { OUT_OF_SCOPE, placeholder } from './placeholder'
 
 export default function Holdings({ total }: { total?: bigint }) {
@@ -7,8 +7,8 @@ export default function Holdings({ total }: { total?: bigint }) {
       <nav id="holdBox" className="box" aria-label="Holdings">
         <div className="ttl">holdings</div>
         <button className="hrow act" {...placeholder(OUT_OF_SCOPE)}>
-          <span>{total === undefined ? '—' : formatXrp(total)} XRP</span>
-          <small>$0.00</small>
+          <span>{total === undefined ? '—' : formatXmrShort(total)} XMR</span>
+          <small>$-,--</small>
         </button>
       </nav>
     </div>

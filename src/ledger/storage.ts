@@ -3,13 +3,17 @@ import { type Budget, type Entry, snapshot, starterBudget } from './ledger'
 // Saved in the browser (localStorage). No login, no server.
 // bigint amounts are written as decimal strings, since JSON has no bigint type.
 
-export const STORAGE_KEY = 'boss-budget:v1'
-const FORMAT_VERSION = 1
+export const STORAGE_KEY = 'boss-budget:v2'
+const FORMAT_VERSION = 2
+
+// Where V1 saved its XRP budget. V2 deletes it the first time it opens and starts fresh (V2 PRD, Phase 1).
+export const V1_STORAGE_KEY = 'boss-budget:v1'
 
 /** The part of localStorage we use; tests pass in an in-memory stand-in. */
 export interface KeyValueStore {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
+  removeItem(key: string): void
 }
 
 export class StorageError extends Error {}
@@ -52,9 +56,11 @@ export function deserialize(text: string): Budget {
 
 /**
  * Loads the saved budget, or the starter budget if nothing is saved yet.
+ * Any XRP budget left by V1 is deleted first, so V2 starts fresh with the starter categories.
  * Damaged data throws rather than being silently replaced, so it is never overwritten by accident.
  */
 export function load(store: KeyValueStore): Budget {
+  store.removeItem(V1_STORAGE_KEY)
   const text = store.getItem(STORAGE_KEY)
   return text === null ? starterBudget() : deserialize(text)
 }
