@@ -7,7 +7,7 @@ export default function Holdings({ total }: { total?: bigint }) {
       <nav id="holdBox" className="box" aria-label="Holdings">
         <div className="ttl">holdings</div>
         <button className="hrow act" {...placeholder(OUT_OF_SCOPE)}>
-          <span>{total === undefined ? '—' : formatXmrShort(total)} XMR</span>
+          <span className={total !== undefined && total < 0n ? 'neg' : undefined}>{total === undefined ? '—' : formatXmrShort(total)} XMR</span>
           <small>$-,--</small>
         </button>
       </nav>

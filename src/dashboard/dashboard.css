@@ -87,14 +87,34 @@ table.bud td.empty { height: auto; padding: 30px; text-align: center; color: var
 #bossC { left: 500px; top: 742px; width: 130px; height: 44px; }
 #bossBtn { width: 100%; height: 100%; border: 1.6px solid var(--ink); border-radius: 18px 6px 20px 5px; background: #fff; font-size: 20px; letter-spacing: 2px; box-shadow: 3px 3px 0 var(--ink2); }
 
-/* transaction history (placeholder) */
-#txC { left: 870px; top: 592px; width: 390px; height: 152px; }
-table.tx { width: 100%; border-collapse: collapse; }
-table.tx td { border-bottom: 1.2px solid var(--ink); height: 37px; padding: 0 10px; font-size: 16px; white-space: nowrap; }
+/* corner box: the mini history, or the mini budget while the history is in the center.
+   It starts just right of the pop-up (which ends at 930px), so the pop-up never covers it. */
+#txC { left: 940px; top: 592px; width: 320px; height: 152px; overflow-y: auto; }
+table.tx { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.tx td { border-bottom: 1.2px solid var(--ink); height: 37px; padding: 0 6px; font-size: 14px; white-space: nowrap; overflow: hidden; }
 table.tx td + td { border-left: 1.2px solid var(--ink); }
-table.tx td.num { text-align: right; }
-.squig { display: inline-block; width: 52px; height: 10px; vertical-align: middle; }
-#txArrowC { left: 1040px; top: 750px; }
+table.tx td.date { width: 84px; }
+table.tx td.note { text-overflow: ellipsis; }
+table.tx td.usd { width: 44px; text-align: right; }
+table.tx td.num { width: 76px; text-align: right; }
+#txArrowC { left: 1078px; top: 750px; }
+
+/* negative balances and holdings (only an edit or delete can leave one), and spends whose category was deleted */
+.neg, table.bud td.neg, .unassigned { color: #c0392b; }
+
+/* the full history, in the central box */
+table.bud.hist td { font-size: 16px; padding: 0 10px; }
+table.bud.hist td + td { width: auto; text-align: left; }
+table.bud.hist td.date { width: 104px; }
+table.bud.hist td.note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.bud.hist td.hcat { width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+table.bud.hist td:nth-child(4) { width: 70px; text-align: right; }
+table.bud.hist td:nth-child(5) { width: 190px; text-align: right; }
+.tfoot.hist .c1 { flex: none; width: 104px; }
+.tfoot.hist .c1.note { flex: 1; width: auto; border-left: 1.2px solid var(--ink); }
+.tfoot.hist .c1.hcat { width: 140px; border-left: 1.2px solid var(--ink); }
+.tfoot.hist .c2 { width: 70px; }
+.tfoot.hist .c3 { width: 190px; }
 
 /* category choosing (Move and Delete) */
 table.bud tr.choosable { cursor: pointer; }
@@ -130,8 +150,20 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .fullAmt input { width: 100%; border: 0; outline: 0; padding: 0; background: transparent; font: inherit; color: inherit; text-align: right; }
 .fullAmt.bad input { color: #c0392b; }
 .fld.usd { color: var(--ink3); background: #fafaf7; }
-.fld.ph { background: #fafaf7; border-color: var(--ink3); }
-.fld.ph.wide { grid-column: span 2; }
+.fld.wide { grid-column: span 2; }
+.fld input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; font: inherit; color: inherit; }
+.fld.bad input { color: #c0392b; }
+/* Edit spend's From list, under the From box */
+.fromWrap { position: relative; display: grid; }
+.fromList { position: absolute; top: 40px; left: 0; right: 0; z-index: 2; max-height: 170px; overflow-y: auto; margin: 0; padding: 0; list-style: none; border: 1.4px solid var(--ink); border-radius: 6px; background: #fff; box-shadow: 3px 4px 0 var(--ink3); }
+.fromList button { display: flex; width: 100%; gap: 10px; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--ink3); background: #fff; font-size: 15px; text-align: left; }
+.fromList button:hover { background: #f4f8fb; }
+.fromList li[aria-selected='true'] button { background: var(--accent-soft); }
+.fromList .cat { flex: 1; }
+.fromList .usd { color: var(--ink3); }
+.fromList .xmr { width: 90px; text-align: right; }
+/* Style A confirmation: the question replaces the fields */
+.question { padding: 10px 14px 6px; font-size: 18px; }
 .popFoot { display: flex; align-items: center; gap: 10px; padding: 12px 12px 0; }
 .popNote { flex: 1; padding-left: 2px; font-size: 13px; color: var(--ink2); }
 .popNote.err { color: #c0392b; }
@@ -139,4 +171,4 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .pb:hover { background: #f3f3ef; }
 .pb.main { box-shadow: 2px 3px 0 var(--ink2); }
 .pb.main.dull:hover { background: #fff; }
-.pop-delete .pb.main:not(.dull) { border-color: #a93226; color: #a93226; }
+.pop-delete .pb.main:not(.dull), .pb.del { border-color: #a93226; color: #a93226; }

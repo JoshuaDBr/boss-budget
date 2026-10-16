@@ -1,30 +1,71 @@
-import { addCategory, deleteCategory, deposit, move, spend, type Budget, type Category } from '../ledger/ledger'
+import { digitsToIso, isoToDigits, todayIso } from '../ledger/dates'
+import {
+  addCategory,
+  deleteCategory,
+  deleteTransaction,
+  deposit,
+  editTransaction,
+  move,
+  spend,
+  type Budget,
+  type Category,
+  type Transaction,
+} from '../ledger/ledger'
 import { canDelete, canMoveFrom, canMoveTo, canSpendFrom, checkAmount, nameProblem } from './categoryRules'
 
-// Which pop-up is open (Add, Move, Delete, Deposit or Spend), and what has been filled in so far. Nothing here touches the ledger;
-// the ledger only changes when Save (or Delete Category) is pressed.
+// Which pop-up is open (Add, Move, Delete, Deposit, Spend or an edit), and what has been filled in so far. Nothing here
+// touches the ledger; the ledger only changes when Save (or Delete Category), or Yes on a confirmation, is pressed.
 
 export type MoveField = 'from' | 'to' | 'amount'
-export type SpendField = 'from' | 'amount'
+export type SpendField = 'from' | 'amount' | 'note' | 'date'
+export type DepositField = Exclude<SpendField, 'from'>
+
+/** What a deposit, spend or edit pop-up holds besides its amount. The date is the digits typed so far, "mmddyyyy". */
+interface Entry {
+  amount: string
+  note: string
+  date: string
+  /** Which question has replaced the fields: the Save confirmation, or (edits only) the Delete confirmation. */
+  confirm?: 'save' | 'delete'
+}
 
 export type Mode =
   | { kind: 'add'; name: string }
   | { kind: 'move'; from?: string; to?: string; amount: string; active: MoveField }
   | { kind: 'delete'; id?: string }
-  | { kind: 'deposit'; amount: string }
-  | { kind: 'spend'; from?: string; amount: string; active: SpendField }
+  | ({ kind: 'deposit'; active: DepositField } & Entry)
+  | ({ kind: 'spend'; from?: string; active: SpendField } & Entry)
+  /** Editing a past deposit (no From) or spend. \`listOpen\` is the From list, which opens under the From box. */
+  | ({ kind: 'edit'; id: string; spend: boolean; from?: string; active: SpendField | null; listOpen: boolean } & Entry)
 
 export type AddMode = Extract<Mode, { kind: 'add' }>
 export type MoveMode = Extract<Mode, { kind: 'move' }>
 export type DeleteMode = Extract<Mode, { kind: 'delete' }>
 export type DepositMode = Extract<Mode, { kind: 'deposit' }>
 export type SpendMode = Extract<Mode, { kind: 'spend' }>
+export type EditMode = Extract<Mode, { kind: 'edit' }>
+export type EntryMode = DepositMode | SpendMode | EditMode
+
+const blankEntry = () => ({ amount: '', note: '', date: isoToDigits(todayIso()) })
 
 export const startAdd = (): AddMode => ({ kind: 'add', name: '' })
 export const startMove = (): MoveMode => ({ kind: 'move', amount: '', active: 'from' })
 export const startDelete = (): DeleteMode => ({ kind: 'delete' })
-export const startDeposit = (): DepositMode => ({ kind: 'deposit', amount: '' })
-export const startSpend = (): SpendMode => ({ kind: 'spend', amount: '', active: 'from' })
+export const startDeposit = (): DepositMode => ({ kind: 'deposit', active: 'amount', ...blankEntry() })
+export const startSpend = (): SpendMode => ({ kind: 'spend', active: 'from', ...blankEntry() })
+
+/** Opens a past transaction for editing, filled with its current values. Nothing starts with the emphasis. */
+export const startEdit = (t: Transaction, amount: string): EditMode => ({
+  kind: 'edit',
+  id: t.id,
+  spend: t.kind === 'spend',
+  from: t.from,
+  amount,
+  note: t.note,
+  date: isoToDigits(t.date),
+  active: null,
+  listOpen: false,
+})
 
 /** Whether clicking this category's row would choose it right now (and so whether it shows a "select" marker). */
 export function isChoosable(mode: Mode | null, category: Category): boolean {
@@ -50,9 +91,16 @@ export function choose(mode: Mode, category: Category): Mode {
   return { ...mode, to: category.id, active: mode.from ? 'amount' : 'from' }
 }
 
+/** The typed date as "yyyy-mm-dd", or null unless it is a real date that is today or earlier. */
+export function entryDate(digits: string, today: string = todayIso()): string | null {
+  const iso = digitsToIso(digits)
+  return iso !== null && iso <= today ? iso : null
+}
+
 /**
  * The ledger operation that Save would apply, or null while the pop-up is not ready
- * (which is when Save is dull and cannot be clicked).
+ * (which is when Save is dull and cannot be clicked). For Deposit, Spend and edits, Save first asks for confirmation,
+ * and this is the operation that Yes applies.
  */
 export function pendingChange(mode: Mode, categories: readonly Category[]): ((budget: Budget) => Budget) | null {
   switch (mode.kind) {
@@ -71,13 +119,33 @@ export function pendingChange(mode: Mode, categories: readonly Category[]): ((bu
     }
     case 'deposit': {
       const { piconero } = checkAmount(mode.amount)
-      return piconero === undefined ? null : budget => deposit(budget, piconero)
+      const date = entryDate(mode.date)
+      if (piconero === undefined || date === null) return null
+      return budget => deposit(budget, piconero, { note: mode.note.trim(), date })
     }
     case 'spend': {
       const from = categories.find(c => c.id === mode.from)
       const { piconero } = checkAmount(mode.amount, from)
-      if (!from || !canSpendFrom(from) || piconero === undefined) return null
-      return budget => spend(budget, from.id, piconero)
+      const date = entryDate(mode.date)
+      if (!from || !canSpendFrom(from) || piconero === undefined || date === null) return null
+      return budget => spend(budget, from.id, piconero, { note: mode.note.trim(), date })
+    }
+    case 'edit': {
+      // An edit has no "holds only" limit, and any category except Ready to Assign can be From.
+      const { piconero } = checkAmount(mode.amount)
+      const date = entryDate(mode.date)
+      const from = mode.spend ? editableFrom(categories).find(c => c.id === mode.from) : undefined
+      if (piconero === undefined || date === null || (mode.spend && !from)) return null
+      return budget => editTransaction(budget, mode.id, { from: from?.id, amount: piconero, note: mode.note.trim(), date })
     }
   }
 }
+
+/** The categories an edited spend can come from: all of them except Ready to Assign, even those holding 0 XMR. */
+export const editableFrom = (categories: readonly Category[]) => categories.filter(c => canDelete(c))
+
+/** The operation Yes applies on an edit's Delete confirmation. */
+export const deleteChange = (mode: EditMode) => (budget: Budget) => deleteTransaction(budget, mode.id)
+
+/** Deposit, Spend and edits confirm before saving; Add, Move and Delete Category do not. */
+export const confirmsSave = (mode: Mode): mode is EntryMode => mode.kind === 'deposit' || mode.kind === 'spend' || mode.kind === 'edit'
