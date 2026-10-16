@@ -7,6 +7,7 @@ import {
   deleteChange,
   entryDate,
   isChoosable,
+  nextField,
   pendingChange,
   startAdd,
   startDelete,
@@ -200,5 +201,40 @@ describe('edit pop-up', () => {
     expect(balancesAfter(startEdit(transactions[0], '0.000000000001'))).toEqual([-3n, 1n, 0n, 0n])
     const remove = deleteChange(startEdit(transactions[1], ''))
     expect(snapshot(remove(funded)).categories.map(c => c.balance)).toEqual([6n, 4n, 0n, 0n])
+  })
+})
+
+describe('Tab through the fields', () => {
+  const walk = (mode: Mode, steps: number, back = false) => {
+    const seen: unknown[] = []
+    for (let i = 0; i < steps; i++) {
+      mode = nextField(mode, back)
+      seen.push((mode as { active?: unknown }).active)
+    }
+    return seen
+  }
+
+  it('Spend goes From → amount → Note → Date, then wraps round; Shift+Tab goes back', () => {
+    expect(walk(startSpend(), 4)).toEqual(['amount', 'note', 'date', 'from'])
+    expect(walk(startSpend(), 2, true)).toEqual(['date', 'note'])
+  })
+
+  it('Move goes From → amount → To, in the order the fields sit', () => {
+    expect(walk(startMove(), 3)).toEqual(['amount', 'to', 'from'])
+  })
+
+  it('Deposit has no From, so it goes amount → Note → Date', () => {
+    expect(walk(startDeposit(), 3)).toEqual(['note', 'date', 'amount'])
+  })
+
+  it('an edit starts on nothing and goes to its first field, closing the From list', () => {
+    const spendEdit = { ...startSpend(), kind: 'edit', id: 't', spend: true, active: null, listOpen: true } as Mode
+    expect(nextField(spendEdit)).toMatchObject({ active: 'from', listOpen: false })
+    expect(nextField(spendEdit, true)).toMatchObject({ active: 'date' })
+    expect(nextField({ ...spendEdit, spend: false } as Mode)).toMatchObject({ active: 'amount' })
+  })
+
+  it('leaves Add, Delete and an open confirmation alone', () => {
+    for (const mode of [startAdd(), startDelete(), { ...startSpend(), confirm: 'save' } as Mode]) expect(nextField(mode)).toBe(mode)
   })
 })
