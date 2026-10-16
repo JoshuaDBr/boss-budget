@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatXmr, formatXmrShort, parseXmr } from './piconero'
+import { formatXmr, formatXmrShort, isXmrDraft, parseXmr } from './piconero'
 
 describe('parseXmr', () => {
   it('converts XMR to piconero exactly', () => {
@@ -40,5 +40,15 @@ describe('formatXmrShort', () => {
     expect(formatXmrShort(999_999_999_999n)).toBe('0.9999')
     expect(formatXmrShort(1n)).toBe('0.0000')
     expect(formatXmrShort(-4_213_000_000n)).toBe('-0.0042')
+  })
+})
+
+describe('isXmrDraft', () => {
+  it('lets an amount be typed one character at a time, up to twelve decimal places', () => {
+    for (const draft of ['', '1', '12.', '.5', '0.123456789012']) expect(isXmrDraft(draft)).toBe(true)
+  })
+
+  it('refuses a thirteenth decimal place, a second point, and anything that is not a digit', () => {
+    for (const draft of ['0.1234567890123', '1.2.3', '1a', '-1', '1 ', '1,5']) expect(isXmrDraft(draft)).toBe(false)
   })
 })

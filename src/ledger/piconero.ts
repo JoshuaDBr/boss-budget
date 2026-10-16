@@ -15,6 +15,9 @@ export function parseXmr(input: string): bigint | null {
   return whole * PICONERO_PER_XMR + fraction
 }
 
+/** Whether typed text could still become a valid amount: digits, at most one point, and at most 12 digits after it. */
+export const isXmrDraft = (input: string) => /^\d*(?:\.\d{0,12})?$/.test(input)
+
 /** Formats piconero as an XMR string with all twelve decimal places ("12.500000000000", "0.000000000001"). */
 export function formatXmr(piconero: bigint): string {
   const sign = piconero < 0n ? '-' : ''

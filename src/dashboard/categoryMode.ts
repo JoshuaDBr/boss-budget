@@ -67,6 +67,26 @@ export const startEdit = (t: Transaction, amount: string): EditMode => ({
   listOpen: false,
 })
 
+/** The order Tab walks through each pop-up's fields, top left to bottom right. */
+function fieldOrder(mode: MoveMode | EntryMode): readonly (MoveField | SpendField)[] {
+  if (mode.kind === 'move') return ['from', 'amount', 'to']
+  if (mode.kind === 'spend' || (mode.kind === 'edit' && mode.spend)) return ['from', 'amount', 'note', 'date']
+  return ['amount', 'note', 'date']
+}
+
+/**
+ * Tab (or Shift+Tab, with `back`) passes the emphasis to the next (or previous) field, wrapping round at the ends.
+ * An edit, which starts with nothing emphasized, goes to its first (or last) field. Add, Delete and an open
+ * confirmation stay as they are.
+ */
+export function nextField(mode: Mode, back = false): Mode {
+  if (mode.kind === 'add' || mode.kind === 'delete' || (mode.kind !== 'move' && mode.confirm)) return mode
+  const order = fieldOrder(mode)
+  const at = mode.active === null ? (back ? 0 : -1) : order.indexOf(mode.active)
+  const active = order[(at + (back ? -1 : 1) + order.length) % order.length]
+  return { ...mode, active, ...(mode.kind === 'edit' && { listOpen: false }) } as Mode
+}
+
 /** Whether clicking this category's row would choose it right now (and so whether it shows a "select" marker). */
 export function isChoosable(mode: Mode | null, category: Category): boolean {
   if (mode?.kind === 'delete') return canDelete(category)

@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { formatDateDigits } from '../ledger/dates'
-import { formatXmr, formatXmrShort, parseXmr } from '../ledger/piconero'
+import { formatXmr, formatXmrShort, isXmrDraft, parseXmr } from '../ledger/piconero'
 import { MAX_NOTE_LENGTH, type Category, type Snapshot } from '../ledger/ledger'
-import { editableFrom, entryDate, type EditMode, type EntryMode, type Mode, type MoveField, type MoveMode, type SpendField, type SpendMode } from './categoryMode'
+import { editableFrom, entryDate, nextField, type EditMode, type EntryMode, type Mode, type MoveField, type MoveMode, type SpendField, type SpendMode } from './categoryMode'
 import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
 
 // The Add, Move, Delete, Deposit, Spend and Edit pop-up. It is as wide as the categories table and sits just below it,
@@ -33,8 +33,18 @@ export default function CategoryPopup({ snapshot, mode, ready, error, onChange, 
   const entry = mode.kind === 'deposit' || mode.kind === 'spend' || mode.kind === 'edit' ? mode : null
   const asking = entry?.confirm !== undefined && entry.confirm
 
+  // Tab and Shift+Tab step through the fields. Leaving the amount writes it out to twelve places, as clicking away does.
+  const tab = (e: KeyboardEvent) => {
+    if (e.key !== 'Tab') return
+    const next = nextField(mode, e.shiftKey)
+    if (next === mode) return
+    e.preventDefault()
+    const piconero = 'amount' in next ? parseXmr(next.amount) : null
+    onChange(piconero === null ? next : ({ ...next, amount: formatXmr(piconero) } as Mode))
+  }
+
   return (
-    <section id="popC" className={`comp box pop-${mode.kind}`} role="dialog" aria-label={label(mode)}>
+    <section id="popC" className={`comp box pop-${mode.kind}`} role="dialog" aria-label={label(mode)} onKeyDown={tab}>
       {TITLED.has(mode.kind) && <div className="popTitle">{label(mode)}</div>}
       {mode.kind === 'move' && (
         <MoveFields
@@ -231,10 +241,12 @@ function EntryFields({ mode, snapshot, problem, ready, onChange, onSave }: Entry
 function FromList({ mode, categories, onChange }: { mode: EditMode; categories: readonly Category[]; onChange: (mode: Mode) => void }) {
   const from = categories.find(c => c.id === mode.from)
   const choices = editableFrom(categories)
+  const box = useFocusWhen(mode.active === 'from')
 
   return (
     <div className="fromWrap">
       <button
+        ref={box}
         type="button"
         className={`fld${mode.active === 'from' ? ' on' : ''}`}
         aria-haspopup="listbox"
@@ -269,10 +281,12 @@ interface TextProps {
 
 /** The optional note, up to 30 characters. */
 function NoteBox({ value, active, onActivate, onChange, onEnter }: TextProps & { value: string; onChange: (note: string) => void }) {
+  const box = useFocusWhen<HTMLInputElement>(active)
   return (
     <label className={active ? 'fld on' : 'fld'}>
       <span className="lab">Note</span>
       <input
+        ref={box}
         value={value}
         maxLength={MAX_NOTE_LENGTH}
         autoComplete="off"
@@ -289,7 +303,7 @@ function NoteBox({ value, active, onActivate, onChange, onEnter }: TextProps & {
  * A date that is not real, or is after today, shows in red and keeps Save dull.
  */
 function DateBox({ digits, active, onActivate, onChange, onEnter }: TextProps & { digits: string; onChange: (digits: string) => void }) {
-  const box = useRef<HTMLInputElement>(null)
+  const box = useFocusWhen<HTMLInputElement>(active)
   const caret = useRef<number | null>(null)
   const shown = formatDateDigits(digits)
   const bad = digits.length === 8 && entryDate(digits) === null
@@ -374,8 +388,8 @@ function AmountBox({ label, value, active, problem, onActivate, onChange, onEnte
     if (active) setOpen(true)
   }, [active])
   useEffect(() => {
-    if (open) fullBox.current?.focus()
-  }, [open])
+    if (open && active) fullBox.current?.focus()
+  }, [open, active])
 
   const close = () => {
     setOpen(false)
@@ -403,7 +417,7 @@ function AmountBox({ label, value, active, problem, onActivate, onChange, onEnte
             inputMode="decimal"
             autoComplete="off"
             value={value}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => isXmrDraft(e.target.value) && onChange(e.target.value)}
             onBlur={close}
             onKeyDown={e => e.key === 'Enter' && onEnter()}
           />
@@ -414,10 +428,20 @@ function AmountBox({ label, value, active, problem, onActivate, onChange, onEnte
 }
 
 function Field({ label, value, active, onFocus }: { label: string; value?: string; active: boolean; onFocus: () => void }) {
+  const box = useFocusWhen(active)
   return (
-    <button type="button" className={active ? 'fld on' : 'fld'} onClick={onFocus}>
+    <button ref={box} type="button" className={active ? 'fld on' : 'fld'} onClick={onFocus}>
       <span className="lab">{label}</span>
       {value}
     </button>
   )
+}
+
+/** A ref that puts the cursor in its element whenever the field gets the emphasis, so typing and Tab start there. */
+function useFocusWhen<T extends HTMLElement = HTMLButtonElement>(active: boolean) {
+  const ref = useRef<T>(null)
+  useEffect(() => {
+    if (active) ref.current?.focus()
+  }, [active])
+  return ref
 }
