@@ -99,7 +99,7 @@ table.tx td.usd { width: 44px; text-align: right; }
 table.tx td.num { width: 76px; text-align: right; }
 #txArrowC { left: 1078px; top: 750px; }
 
-/* negative balances (only an edit or delete can leave one), and spends whose category was deleted */
+/* negative balances and holdings (only an edit or delete can leave one), and spends whose category was deleted */
 .neg, table.bud td.neg, .unassigned { color: #c0392b; }
 
 /* the full history, in the central box */
