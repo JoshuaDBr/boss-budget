@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { formatDateDigits } from '../ledger/dates'
-import { formatXmr, formatXmrShort, isXmrDraft, parseXmr } from '../ledger/piconero'
+import { formatAmount, formatShort, isAmountDraft, parseAmount } from '../ledger/amount'
+import type { Coin } from '../ledger/coins'
 import { MAX_NOTE_LENGTH, type Category, type Snapshot } from '../ledger/ledger'
 import { editableFrom, entryDate, nextField, type EditMode, type EntryMode, type Mode, type MoveField, type MoveMode, type SpendField, type SpendMode } from './categoryMode'
 import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
@@ -10,6 +11,8 @@ import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
 
 interface Props {
   snapshot: Snapshot
+  /** The coin on screen. Deposit, Spend, Move and the edits only open while there is one. */
+  coin: Coin | null
   mode: Mode
   ready: boolean
   /** Why the last Save was refused, if it was. */
@@ -21,48 +24,55 @@ interface Props {
   onConfirm: () => void
 }
 
-const LABELS = { add: 'Add a category', move: 'Move XMR', delete: 'Delete a category', deposit: 'Deposit XMR', spend: 'Spend XMR' }
+const LABELS = { add: 'Add a category', move: 'Move', delete: 'Delete a category', deposit: 'Deposit', spend: 'Spend' }
 
 /** The pop-ups that show their name as a title. */
 const TITLED = new Set<Mode['kind']>(['add', 'deposit', 'spend', 'edit'])
 
-const label = (mode: Mode) => (mode.kind === 'edit' ? (mode.spend ? 'Edit spend' : 'Edit deposit') : LABELS[mode.kind])
+/** The pop-up's name. Move, Deposit and Spend name the coin on screen ("Deposit BTC"). */
+function label(mode: Mode, coin: Coin | null) {
+  if (mode.kind === 'edit') return mode.spend ? 'Edit spend' : 'Edit deposit'
+  const name = LABELS[mode.kind]
+  return coin && (mode.kind === 'move' || mode.kind === 'deposit' || mode.kind === 'spend') ? `${name} ${coin.ticker}` : name
+}
 
-export default function CategoryPopup({ snapshot, mode, ready, error, onChange, onSave, onCancel, onConfirm }: Props) {
+export default function CategoryPopup({ snapshot, coin, mode, ready, error, onChange, onSave, onCancel, onConfirm }: Props) {
   const nameOf = (id?: string) => snapshot.categories.find(c => c.id === id)?.name
   const entry = mode.kind === 'deposit' || mode.kind === 'spend' || mode.kind === 'edit' ? mode : null
   const asking = entry?.confirm !== undefined && entry.confirm
 
-  // Tab and Shift+Tab step through the fields. Leaving the amount writes it out to twelve places, as clicking away does.
+  // Tab and Shift+Tab step through the fields. Leaving the amount writes it out to every decimal place, as clicking away does.
   const tab = (e: KeyboardEvent) => {
     if (e.key !== 'Tab') return
     const next = nextField(mode, e.shiftKey)
     if (next === mode) return
     e.preventDefault()
-    const piconero = 'amount' in next ? parseXmr(next.amount) : null
-    onChange(piconero === null ? next : ({ ...next, amount: formatXmr(piconero) } as Mode))
+    const units = coin && 'amount' in next ? parseAmount(next.amount, coin.decimals) : null
+    onChange(units === null || !coin ? next : ({ ...next, amount: formatAmount(units, coin.decimals) } as Mode))
   }
 
   return (
-    <section id="popC" className={`comp box pop-${mode.kind}`} role="dialog" aria-label={label(mode)} onKeyDown={tab}>
-      {TITLED.has(mode.kind) && <div className="popTitle">{label(mode)}</div>}
-      {mode.kind === 'move' && (
+    <section id="popC" className={`comp box pop-${mode.kind}`} role="dialog" aria-label={label(mode, coin)} onKeyDown={tab}>
+      {TITLED.has(mode.kind) && <div className="popTitle">{label(mode, coin)}</div>}
+      {mode.kind === 'move' && coin && (
         <MoveFields
           mode={mode}
+          coin={coin}
           fromName={nameOf(mode.from)}
           toName={nameOf(mode.to)}
-          problem={checkAmount(mode.amount, snapshot.categories.find(c => c.id === mode.from)).problem}
+          problem={checkAmount(mode.amount, coin, snapshot.categories.find(c => c.id === mode.from)).problem}
           ready={ready}
           onChange={onChange}
           onSave={onSave}
         />
       )}
-      {entry && asking && <Question mode={entry} amount={confirmedAmount(entry, snapshot)} />}
-      {entry && !asking && (
+      {entry && coin && asking && <Question mode={entry} coin={coin} amount={confirmedAmount(entry, snapshot, coin)} />}
+      {entry && coin && !asking && (
         <EntryFields
           mode={entry}
+          coin={coin}
           snapshot={snapshot}
-          problem={entry.kind === 'spend' ? checkAmount(entry.amount, snapshot.categories.find(c => c.id === entry.from)).problem : undefined}
+          problem={entry.kind === 'spend' ? checkAmount(entry.amount, coin, snapshot.categories.find(c => c.id === entry.from)).problem : undefined}
           ready={ready}
           onChange={onChange}
           onSave={onSave}
@@ -79,7 +89,7 @@ export default function CategoryPopup({ snapshot, mode, ready, error, onChange, 
             Delete
           </button>
         )}
-        <div className={error ? 'popNote err' : 'popNote'}>{error ?? (asking ? '' : note(mode, snapshot))}</div>
+        <div className={error ? 'popNote err' : 'popNote'}>{error ?? (asking ? '' : note(mode, snapshot, coin))}</div>
         {entry && asking ? (
           <>
             <button type="button" className="pb" onClick={() => onChange({ ...entry, confirm: undefined })}>
@@ -111,16 +121,16 @@ export default function CategoryPopup({ snapshot, mode, ready, error, onChange, 
 }
 
 /** The amount a confirmation names: the typed amount for Save, and the recorded amount for Delete. */
-function confirmedAmount(mode: EntryMode, snapshot: Snapshot): bigint {
+function confirmedAmount(mode: EntryMode, snapshot: Snapshot, coin: Coin): bigint {
   if (mode.kind === 'edit' && mode.confirm === 'delete') return snapshot.transactions.find(t => t.id === mode.id)?.amount ?? 0n
-  return parseXmr(mode.amount) ?? 0n
+  return parseAmount(mode.amount, coin.decimals) ?? 0n
 }
 
 /**
  * The line beside the buttons. It only speaks up for a duplicate name, a move or spend larger than the
  * From balance, and the delete confirmation; otherwise it is empty.
  */
-function note(mode: Mode, snapshot: Snapshot): string {
+function note(mode: Mode, snapshot: Snapshot, coin: Coin | null): string {
   switch (mode.kind) {
     case 'add':
       return nameProblem(mode.name, snapshot.categories) === 'duplicate' ? 'A category with that name already exists.' : ''
@@ -129,16 +139,17 @@ function note(mode: Mode, snapshot: Snapshot): string {
       return ''
     case 'move':
     case 'spend':
-      return checkAmount(mode.amount, snapshot.categories.find(c => c.id === mode.from)).problem ?? ''
+      return coin ? (checkAmount(mode.amount, coin, snapshot.categories.find(c => c.id === mode.from)).problem ?? '') : ''
     case 'delete': {
       const category = snapshot.categories.find(c => c.id === mode.id)
-      return category ? deleteMessage(category) : ''
+      return category ? deleteMessage(category, coin) : ''
     }
   }
 }
 
 interface MoveProps {
   mode: MoveMode
+  coin: Coin
   fromName?: string
   toName?: string
   problem?: string
@@ -147,7 +158,7 @@ interface MoveProps {
   onSave: () => void
 }
 
-function MoveFields({ mode, fromName, toName, problem, ready, onChange, onSave }: MoveProps) {
+function MoveFields({ mode, coin, fromName, toName, problem, ready, onChange, onSave }: MoveProps) {
   const activate = (active: MoveField) => mode.active !== active && onChange({ ...mode, active })
 
   return (
@@ -157,7 +168,8 @@ function MoveFields({ mode, fromName, toName, problem, ready, onChange, onSave }
         $-,--
       </div>
       <AmountBox
-        label="XMR to move"
+        label={`${coin.ticker} to move`}
+        coin={coin}
         value={mode.amount}
         active={mode.active === 'amount'}
         problem={problem}
@@ -172,6 +184,7 @@ function MoveFields({ mode, fromName, toName, problem, ready, onChange, onSave }
 
 interface EntryProps {
   mode: EntryMode
+  coin: Coin
   snapshot: Snapshot
   problem?: string
   ready: boolean
@@ -180,10 +193,10 @@ interface EntryProps {
 }
 
 /**
- * Spend and Edit spend: From, USD and XMR, then Note and Date. Deposit and Edit deposit: USD and XMR (under their columns),
+ * Spend and Edit spend: From, USD and the coin, then Note and Date. Deposit and Edit deposit: USD and the coin (under their columns),
  * then Note and Date.
  */
-function EntryFields({ mode, snapshot, problem, ready, onChange, onSave }: EntryProps) {
+function EntryFields({ mode, coin, snapshot, problem, ready, onChange, onSave }: EntryProps) {
   // Moving to another field closes Edit spend's From list.
   const activate = (active: SpendField) =>
     mode.active !== active && onChange({ ...mode, active, ...(mode.kind === 'edit' && { listOpen: false }) } as Mode)
@@ -193,7 +206,7 @@ function EntryFields({ mode, snapshot, problem, ready, onChange, onSave }: Entry
   return (
     <div className="popGrid">
       {mode.kind === 'edit' && mode.spend ? (
-        <FromList mode={mode} categories={snapshot.categories} onChange={onChange} />
+        <FromList mode={mode} coin={coin} categories={snapshot.categories} onChange={onChange} />
       ) : hasFrom ? (
         <Field
           label="From"
@@ -208,7 +221,8 @@ function EntryFields({ mode, snapshot, problem, ready, onChange, onSave }: Entry
         $-,--
       </div>
       <AmountBox
-        label={`XMR to ${mode.kind === 'edit' ? (mode.spend ? 'spend' : 'deposit') : mode.kind}`}
+        label={`${coin.ticker} to ${mode.kind === 'edit' ? (mode.spend ? 'spend' : 'deposit') : mode.kind}`}
+        coin={coin}
         value={mode.amount}
         active={mode.active === 'amount'}
         problem={problem}
@@ -236,9 +250,9 @@ function EntryFields({ mode, snapshot, problem, ready, onChange, onSave }: Entry
 
 /**
  * Edit spend's From box. Clicking it opens a list under it of every category except Ready to Assign, each with its
- * dollar amount and its XMR to four decimal places, cut. A spend whose category was deleted shows "Unassigned" in red.
+ * dollar amount and its amount in the coin to six decimal places, cut. A spend whose category was deleted shows "Unassigned" in red.
  */
-function FromList({ mode, categories, onChange }: { mode: EditMode; categories: readonly Category[]; onChange: (mode: Mode) => void }) {
+function FromList({ mode, coin, categories, onChange }: { mode: EditMode; coin: Coin; categories: readonly Category[]; onChange: (mode: Mode) => void }) {
   const from = categories.find(c => c.id === mode.from)
   const choices = editableFrom(categories)
   const box = useFocusWhen(mode.active === 'from')
@@ -263,7 +277,7 @@ function FromList({ mode, categories, onChange }: { mode: EditMode; categories: 
               <button type="button" onClick={() => onChange({ ...mode, from: c.id, listOpen: false, active: 'amount' })}>
                 <span className="cat">{c.name}</span>
                 <span className="usd">$-,--</span>
-                <span className={c.balance < 0n ? 'xmr neg' : 'xmr'}>{formatXmrShort(c.balance)}</span>
+                <span className={c.balance < 0n ? 'xmr neg' : 'xmr'}>{formatShort(c.balance, coin.decimals)}</span>
               </button>
             </li>
           ))}
@@ -345,9 +359,9 @@ function DateBox({ digits, active, onActivate, onChange, onEnter }: TextProps & 
 }
 
 /** Style A: the question replaces the fields, and the pop-up keeps its title. */
-function Question({ mode, amount }: { mode: EntryMode; amount: bigint }) {
+function Question({ mode, coin, amount }: { mode: EntryMode; coin: Coin; amount: bigint }) {
   const verb = mode.kind === 'edit' ? (mode.spend ? 'spend' : 'deposit') : mode.kind
-  const xmr = <strong>{formatXmr(amount)} XMR</strong>
+  const xmr = <strong>{formatAmount(amount, coin.decimals)} {coin.ticker}</strong>
   return (
     <div className="question">
       {mode.confirm === 'delete' ? (
@@ -365,6 +379,7 @@ function Question({ mode, amount }: { mode: EntryMode; amount: bigint }) {
 
 interface AmountProps {
   label: string
+  coin: Coin
   value: string
   active: boolean
   problem?: string
@@ -374,14 +389,14 @@ interface AmountProps {
 }
 
 /**
- * The XMR amount. The box in the row shows four decimal places, cut. Typing happens in a full box laid over the
- * entry line, which opens whenever the amount gets the cursor and shows all twelve. On leaving it, a valid amount is
- * written out to twelve places, so digits past the fourth read as zeros until changed.
+ * The amount, in the coin on screen. The box in the row shows six decimal places, cut. Typing happens in a full box
+ * laid over the entry line, which opens whenever the amount gets the cursor and shows every place the coin has. On
+ * leaving it, a valid amount is written out to every place, so digits past the sixth read as zeros until changed.
  */
-function AmountBox({ label, value, active, problem, onActivate, onChange, onEnter }: AmountProps) {
+function AmountBox({ label, coin, value, active, problem, onActivate, onChange, onEnter }: AmountProps) {
   const [open, setOpen] = useState(active)
   const fullBox = useRef<HTMLInputElement>(null)
-  const piconero = parseXmr(value)
+  const units = parseAmount(value, coin.decimals)
 
   // When the emphasis reaches the amount, the full box opens with the cursor in it.
   useEffect(() => {
@@ -393,7 +408,7 @@ function AmountBox({ label, value, active, problem, onActivate, onChange, onEnte
 
   const close = () => {
     setOpen(false)
-    if (piconero !== null) onChange(formatXmr(piconero))
+    if (units !== null) onChange(formatAmount(units, coin.decimals))
   }
 
   return (
@@ -407,7 +422,7 @@ function AmountBox({ label, value, active, problem, onActivate, onChange, onEnte
           setOpen(true)
         }}
       >
-        {piconero === null ? value : formatXmrShort(piconero)}
+        {units === null ? value : formatShort(units, coin.decimals)}
       </button>
       {open && active && (
         <label className={problem ? 'fullAmt bad' : 'fullAmt'}>
@@ -417,7 +432,7 @@ function AmountBox({ label, value, active, problem, onActivate, onChange, onEnte
             inputMode="decimal"
             autoComplete="off"
             value={value}
-            onChange={e => isXmrDraft(e.target.value) && onChange(e.target.value)}
+            onChange={e => isAmountDraft(e.target.value, coin.decimals) && onChange(e.target.value)}
             onBlur={close}
             onKeyDown={e => e.key === 'Enter' && onEnter()}
           />

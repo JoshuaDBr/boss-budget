@@ -6,11 +6,14 @@ import {
   deposit,
   editTransaction,
   move,
+  newId,
   spend,
   type Budget,
   type Category,
   type Transaction,
 } from '../ledger/ledger'
+import type { Coin } from '../ledger/coins'
+import type { Scope } from '../useBook'
 import { canDelete, canMoveFrom, canMoveTo, canSpendFrom, checkAmount, nameProblem } from './categoryRules'
 
 // Which pop-up is open (Add, Move, Delete, Deposit, Spend or an edit), and what has been filled in so far. Nothing here
@@ -120,52 +123,60 @@ export function entryDate(digits: string, today: string = todayIso()): string | 
 /**
  * The ledger operation that Save would apply, or null while the pop-up is not ready
  * (which is when Save is dull and cannot be clicked). For Deposit, Spend and edits, Save first asks for confirmation,
- * and this is the operation that Yes applies.
+ * and this is the operation that Yes applies. Amounts are in the coin on screen; with no coin, only Add and Delete
+ * can be ready.
  */
-export function pendingChange(mode: Mode, categories: readonly Category[]): ((budget: Budget) => Budget) | null {
+export function pendingChange(mode: Mode, categories: readonly Category[], coin: Coin | null): ((budget: Budget) => Budget) | null {
+  if (!coin && scopeOf(mode) === 'coin') return null
   switch (mode.kind) {
-    case 'add':
-      return nameProblem(mode.name, categories) ? null : budget => addCategory(budget, mode.name)
+    case 'add': {
+      // One id for the new category in every coin.
+      const id = newId()
+      return nameProblem(mode.name, categories) ? null : budget => addCategory(budget, mode.name, id)
+    }
     case 'move': {
       const from = categories.find(c => c.id === mode.from)
       const to = categories.find(c => c.id === mode.to)
-      const { piconero } = checkAmount(mode.amount, from)
-      if (!from || !to || piconero === undefined) return null
-      return budget => move(budget, from.id, to.id, piconero)
+      const { units } = checkAmount(mode.amount, coin!, from)
+      if (!from || !to || units === undefined) return null
+      return budget => move(budget, from.id, to.id, units)
     }
     case 'delete': {
       const category = categories.find(c => c.id === mode.id)
       return category && canDelete(category) ? budget => deleteCategory(budget, category.id) : null
     }
     case 'deposit': {
-      const { piconero } = checkAmount(mode.amount)
+      const { units } = checkAmount(mode.amount, coin!)
       const date = entryDate(mode.date)
-      if (piconero === undefined || date === null) return null
-      return budget => deposit(budget, piconero, { note: mode.note.trim(), date })
+      if (units === undefined || date === null) return null
+      return budget => deposit(budget, units, { note: mode.note.trim(), date })
     }
     case 'spend': {
       const from = categories.find(c => c.id === mode.from)
-      const { piconero } = checkAmount(mode.amount, from)
+      const { units } = checkAmount(mode.amount, coin!, from)
       const date = entryDate(mode.date)
-      if (!from || !canSpendFrom(from) || piconero === undefined || date === null) return null
-      return budget => spend(budget, from.id, piconero, { note: mode.note.trim(), date })
+      if (!from || !canSpendFrom(from) || units === undefined || date === null) return null
+      return budget => spend(budget, from.id, units, { note: mode.note.trim(), date })
     }
     case 'edit': {
       // An edit has no "holds only" limit, and any category except Ready to Assign can be From.
-      const { piconero } = checkAmount(mode.amount)
+      const { units } = checkAmount(mode.amount, coin!)
       const date = entryDate(mode.date)
       const from = mode.spend ? editableFrom(categories).find(c => c.id === mode.from) : undefined
-      if (piconero === undefined || date === null || (mode.spend && !from)) return null
-      return budget => editTransaction(budget, mode.id, { from: from?.id, amount: piconero, note: mode.note.trim(), date })
+      if (units === undefined || date === null || (mode.spend && !from)) return null
+      return budget => editTransaction(budget, mode.id, { from: from?.id, amount: units, note: mode.note.trim(), date })
     }
   }
 }
 
-/** The categories an edited spend can come from: all of them except Ready to Assign, even those holding 0 XMR. */
+/** The categories an edited spend can come from: all of them except Ready to Assign, even those holding nothing. */
 export const editableFrom = (categories: readonly Category[]) => categories.filter(c => canDelete(c))
 
 /** The operation Yes applies on an edit's Delete confirmation. */
 export const deleteChange = (mode: EditMode) => (budget: Budget) => deleteTransaction(budget, mode.id)
+
+/** Add and Delete Category change the categories every coin shares; everything else changes the coin on screen. */
+export const scopeOf = (mode: Mode): Scope => (mode.kind === 'add' || mode.kind === 'delete' ? 'categories' : 'coin')
 
 /** Deposit, Spend and edits confirm before saving; Add, Move and Delete Category do not. */
 export const confirmsSave = (mode: Mode): mode is EntryMode => mode.kind === 'deposit' || mode.kind === 'spend' || mode.kind === 'edit'

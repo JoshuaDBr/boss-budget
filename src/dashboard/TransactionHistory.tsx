@@ -1,6 +1,7 @@
 import { isoToUs } from '../ledger/dates'
 import type { Category, Snapshot, Transaction } from '../ledger/ledger'
-import { formatXmr, formatXmrShort } from '../ledger/piconero'
+import { formatAmount, formatShort } from '../ledger/amount'
+import type { Coin } from '../ledger/coins'
 
 // The history and the budget trade places. Normally the budget is in the central box and the corner shows the mini
 // history. The corner arrow swaps them: the full history goes to the center and the corner shows the mini budget.
@@ -9,7 +10,7 @@ import { formatXmr, formatXmrShort } from '../ledger/piconero'
 export const newestFirst = (transactions: readonly Transaction[]) =>
   [...transactions].sort((a, b) => (a.date === b.date ? b.order - a.order : a.date < b.date ? 1 : -1))
 
-/** "+" before a deposit's XMR, "-" before a spend's. */
+/** "+" before a deposit's amount, "-" before a spend's. */
 const sign = (t: Transaction) => (t.kind === 'deposit' ? '+' : '-')
 
 /** A spend's category, or null if that category has been deleted. Deposits land in Ready to Assign. */
@@ -17,6 +18,7 @@ const categoryOf = (t: Transaction, categories: readonly Category[]) => categori
 
 interface CornerProps {
   snapshot?: Snapshot
+  coin: Coin | null
   view: 'budget' | 'history'
   /** Why the arrow cannot be used right now (a pop-up is open), if it cannot. */
   blocked: string | null
@@ -24,7 +26,8 @@ interface CornerProps {
 }
 
 /** The corner box: the mini history (display only), or the mini budget while the history is in the center. */
-export function Corner({ snapshot, view, blocked, onSwap }: CornerProps) {
+export function Corner({ snapshot, coin, view, blocked, onSwap }: CornerProps) {
+  const decimals = coin?.decimals ?? 0
   return (
     <>
       <section key={view} id="txC" className="comp" aria-label={view === 'budget' ? 'Transaction history' : 'Budget'}>
@@ -36,14 +39,14 @@ export function Corner({ snapshot, view, blocked, onSwap }: CornerProps) {
                     <td className="date">{isoToUs(t.date)}</td>
                     <td className="note">{t.note}</td>
                     <td className="usd muted">$-,--</td>
-                    <td className="num">{sign(t)}{formatXmrShort(t.amount)}</td>
+                    <td className="num">{sign(t)}{formatShort(t.amount, decimals)}</td>
                   </tr>
                 ))
               : snapshot?.categories.map(c => (
                   <tr key={c.id}>
                     <td className="note">{c.name}</td>
                     <td className="usd muted">$-,--</td>
-                    <td className={c.balance < 0n ? 'num neg' : 'num'}>{formatXmrShort(c.balance)}</td>
+                    <td className={c.balance < 0n ? 'num neg' : 'num'}>{coin ? formatShort(c.balance, decimals) : ''}</td>
                   </tr>
                 ))}
           </tbody>
@@ -66,13 +69,14 @@ export function Corner({ snapshot, view, blocked, onSwap }: CornerProps) {
 
 interface HistoryProps {
   snapshot: Snapshot
+  coin: Coin | null
   /** Whether rows can be clicked right now (not while a pop-up is open). */
   editable: boolean
   onEdit: (transaction: Transaction) => void
 }
 
 /** The full history in the central box. Clicking a row opens it for editing. */
-export function HistoryTable({ snapshot, editable, onEdit }: HistoryProps) {
+export function HistoryTable({ snapshot, coin, editable, onEdit }: HistoryProps) {
   return (
     <section id="tableC" className="comp box" aria-label="Transaction history">
       <div id="tblScroll">
@@ -88,7 +92,7 @@ export function HistoryTable({ snapshot, editable, onEdit }: HistoryProps) {
                     {t.kind === 'deposit' ? 'Ready to Assign' : category ? category.name : <span className="unassigned">Unassigned</span>}
                   </td>
                   <td>$-,--</td>
-                  <td>{sign(t)}{formatXmr(t.amount)}</td>
+                  <td>{sign(t)}{formatAmount(t.amount, coin?.decimals ?? 0)}</td>
                 </tr>
               )
             })}
@@ -100,7 +104,7 @@ export function HistoryTable({ snapshot, editable, onEdit }: HistoryProps) {
         <div className="c1 note">note</div>
         <div className="c1 hcat">category</div>
         <div className="c2">USD</div>
-        <div className="c3">XMR</div>
+        <div className="c3">{coin?.ticker ?? 'Crypto'}</div>
       </div>
     </section>
   )

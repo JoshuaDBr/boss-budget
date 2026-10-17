@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Category, Transaction } from '../ledger/ledger'
-import { formatXmr } from '../ledger/piconero'
-import type { BudgetStore } from '../useBudget'
+import { formatAmount } from '../ledger/amount'
+import type { BookStore } from '../useBook'
 import BossButton from './BossButton'
 import BudgetActions from './BudgetActions'
 import CategoriesTable from './CategoriesTable'
 import CategoryActions from './CategoryActions'
 import CategoryPopup from './CategoryPopup'
-import { choose, confirmsSave, deleteChange, pendingChange, startEdit, type Mode } from './categoryMode'
+import { choose, confirmsSave, deleteChange, pendingChange, scopeOf, startEdit, type Mode } from './categoryMode'
 import CoinWheel from './CoinWheel'
 import DayRangeWheel from './DayRangeWheel'
 import Filters from './Filters'
@@ -19,20 +19,21 @@ import './dashboard.css'
 
 // Desktop layout: a fixed 1280 x 800 stage. Every component is absolutely
 // positioned, so adding or resizing one never moves another.
-export default function Dashboard({ store }: { store: BudgetStore }) {
+export default function Dashboard({ store }: { store: BookStore }) {
   const { state, update } = store
   const [mode, setMode] = useState<Mode | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Which view is in the central box. The other one shows in the corner.
   const [view, setView] = useState<'budget' | 'history'>('budget')
 
-  const change = mode && state.snapshot ? pendingChange(mode, state.snapshot.categories) : null
+  const coin = state.coin ?? null
+  const change = mode && state.snapshot ? pendingChange(mode, state.snapshot.categories, coin) : null
   const cancel = () => {
     setMode(null)
     setError(null)
   }
   const record = (apply: NonNullable<typeof change>) => {
-    const refused = update(apply)
+    const refused = mode ? update(apply, scopeOf(mode)) : null
     if (refused) setError(refused)
     else cancel()
   }
@@ -99,15 +100,16 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
     <main id="stage">
       <h1 className="sr">Boss Budget</h1>
       <Refresh />
-      <PriceChart />
+      <PriceChart coin={coin} />
       <DayRangeWheel />
-      <Holdings total={state.snapshot?.total} />
-      <CategoryActions blocked={blocked} onStart={edit} />
+      <Holdings coin={coin} total={state.snapshot?.total} />
+      <CategoryActions coin={coin} blocked={blocked} onStart={edit} />
       {view === 'history' && state.snapshot ? (
         <HistoryTable
           snapshot={state.snapshot}
-          editable={!mode}
-          onEdit={(t: Transaction) => edit(startEdit(t, formatXmr(t.amount)))}
+          coin={coin}
+          editable={!mode && coin !== null}
+          onEdit={(t: Transaction) => coin && edit(startEdit(t, formatAmount(t.amount, coin.decimals)))}
         />
       ) : (
         <CategoriesTable
@@ -118,14 +120,15 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
           onSaveName={save}
         />
       )}
-      <BudgetActions blocked={blocked} onStart={edit} />
+      <BudgetActions coin={coin} blocked={blocked ?? (coin ? null : 'Add a currency first')} onStart={edit} />
       <Filters />
       <CoinWheel />
       <BossButton />
-      <Corner snapshot={state.snapshot} view={view} blocked={state.error ?? busy} onSwap={() => setView(view === 'budget' ? 'history' : 'budget')} />
+      <Corner snapshot={state.snapshot} coin={coin} view={view} blocked={state.error ?? busy} onSwap={() => setView(view === 'budget' ? 'history' : 'budget')} />
       {mode && state.snapshot && (
         <CategoryPopup
           snapshot={state.snapshot}
+          coin={coin}
           mode={mode}
           ready={change !== null}
           error={error}

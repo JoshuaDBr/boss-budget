@@ -9,6 +9,7 @@ import {
   editTransaction,
   emptyBudget,
   move,
+  renameCategory,
   snapshot,
   spend,
   starterBudget,
@@ -197,5 +198,42 @@ describe('transaction records', () => {
     expect(() => editTransaction(budget, 's1', { from: 'food', amount: 1n, ...day('2026-02-30') })).toThrow(BudgetError)
     expect(() => editTransaction(budget, 's1', { from: 'food', amount: 1n, ...day('2026-10-01', 'x'.repeat(31)) })).toThrow(BudgetError)
     expect(() => deleteTransaction(deleteTransaction(budget, 's1'), 's1')).toThrow(BudgetError)
+  })
+})
+
+describe('renaming a category', () => {
+  it('keeps its id, balance and place, with the name trimmed', () => {
+    const budget = move(deposit(starterBudget(), 10n), READY_TO_ASSIGN, 'starter-2', 4n)
+    const renamed = renameCategory(budget, 'starter-2', '  Fuel ')
+    expect(snapshot(renamed).categories.map((c) => `${c.id} ${c.name} ${c.balance}`)).toEqual([
+      'ready Ready to Assign 6', 'starter-1 Groceries 0', 'starter-2 Fuel 4', 'starter-3 Emergency 0',
+    ])
+  })
+
+  it('may change only the capitals of its own name, but never take another category’s name', () => {
+    expect(snapshot(renameCategory(starterBudget(), 'starter-2', 'GAS')).categories[2].name).toBe('GAS')
+    expect(() => renameCategory(starterBudget(), 'starter-2', 'groceries')).toThrow(/already exists/)
+  })
+
+  it('refuses a blank or too-long name, an unknown category and Ready to Assign', () => {
+    expect(() => renameCategory(starterBudget(), 'starter-2', '  ')).toThrow(/empty/)
+    expect(() => renameCategory(starterBudget(), 'starter-2', 'Sixteen chars!!!')).toThrow(/15 characters/)
+    expect(() => renameCategory(starterBudget(), 'nope', 'Fuel')).toThrow(/Unknown category/)
+    expect(() => renameCategory(starterBudget(), READY_TO_ASSIGN, 'Inbox')).toThrow(/cannot be renamed/)
+  })
+})
+
+describe('budgets kept in a coin', () => {
+  it('name the coin and its full precision when refusing an amount', () => {
+    const btc = { coin: 'BTC', ...move(deposit(starterBudget(), 150_000_000n), READY_TO_ASSIGN, 'starter-1', 50_000_000n) }
+    expect(() => spend(btc, 'starter-1', 50_000_001n)).toThrow('Groceries holds 0.50000000 BTC, which is less than 0.50000001 BTC')
+  })
+
+  it('keep their coin through every operation', () => {
+    expect(deposit({ coin: 'ETH', ...starterBudget() }, 1n).coin).toBe('ETH')
+  })
+
+  it('refuse a coin that is not on the list', () => {
+    expect(() => snapshot({ coin: 'DOGE', ...starterBudget() })).toThrow(/Unknown coin/)
   })
 })

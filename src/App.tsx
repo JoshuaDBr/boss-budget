@@ -1,6 +1,6 @@
 import Dashboard from './dashboard/Dashboard'
-import { useBudget } from './useBudget'
+import { useBook } from './useBook'
 
 export default function App() {
-  return <Dashboard store={useBudget()} />
+  return <Dashboard store={useBook()} />
 }

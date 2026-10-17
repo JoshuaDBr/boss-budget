@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
-import { formatXmr } from '../ledger/piconero'
+import { formatAmount } from '../ledger/amount'
 import { MAX_NAME_LENGTH, READY_TO_ASSIGN, type Category } from '../ledger/ledger'
-import type { BudgetState } from '../useBudget'
+import type { BookState } from '../useBook'
 import { isChoosable, type Mode } from './categoryMode'
 import { nameProblem } from './categoryRules'
 import { placeholder } from './placeholder'
 
 interface Props {
-  budget: BudgetState
+  budget: BookState
   mode: Mode | null
   onChoose: (category: Category) => void
   onName: (name: string) => void
@@ -56,7 +56,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
                       <td>$-,--</td>
-                      <td className={c.balance < 0n ? 'neg' : undefined}>{formatXmr(c.balance)}</td>
+                      <td className={c.balance < 0n ? 'neg' : undefined}>{budget.coin ? formatAmount(c.balance, budget.coin.decimals) : ''}</td>
                     </tr>
                   )
                 })
@@ -86,7 +86,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                     />
                   </td>
                   <td>$-,--</td>
-                  <td>0</td>
+                  <td>{budget.coin ? 0 : ''}</td>
                 </tr>
               )}
             </tbody>
@@ -95,7 +95,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
         <div className="tfoot">
           <div className="c1">category</div>
           <div className="c2">USD</div>
-          <div className="c3">XMR</div>
+          <div className="c3">{budget.coin?.ticker ?? 'Crypto'}</div>
         </div>
       </section>
       <div id="tblArrowC" className="comp">

@@ -1,4 +1,5 @@
-import { formatXmr, parseXmr } from '../ledger/piconero'
+import { formatAmount, parseAmount } from '../ledger/amount'
+import type { Coin } from '../ledger/coins'
 import { MAX_NAME_LENGTH, READY_TO_ASSIGN, type Category } from '../ledger/ledger'
 
 // The rules the pop-ups apply before anything reaches the ledger.
@@ -15,37 +16,40 @@ export function nameProblem(name: string, categories: readonly Category[]): Name
   return categories.some(c => c.name.toLowerCase() === lower) ? 'duplicate' : null
 }
 
-/** A category can give XMR only if it holds some, and it cannot be the category already chosen as To. */
+/** A category can give money only if it holds some, and it cannot be the category already chosen as To. */
 export const canMoveFrom = (category: Category, to?: string) => category.balance > 0n && category.id !== to
 
-/** Any category can receive XMR except the one it comes from. */
+/** Any category can receive money except the one it comes from. */
 export const canMoveTo = (category: Category, from?: string) => category.id !== from
 
-/** Spending needs a category that holds some XMR, and never Ready to Assign. */
+/** Spending needs a category that holds some money, and never Ready to Assign. */
 export const canSpendFrom = (category: Category) => category.id !== READY_TO_ASSIGN && category.balance > 0n
 
 /** Every category except Ready to Assign can be deleted. */
 export const canDelete = (category: Category) => category.id !== READY_TO_ASSIGN
 
-export type AmountCheck = { piconero: bigint; problem?: undefined } | { piconero?: undefined; problem: string }
+export type AmountCheck = { units: bigint; problem?: undefined } | { units?: undefined; problem: string }
 
 /**
- * Checks a typed amount: above zero, at most 12 decimal places, and no more than the From balance
+ * Checks a typed amount in the coin on screen: above zero, at most the coin's decimal places, and no more than the From balance
  * (a deposit has no From, so no upper limit). Only "more than the From balance" carries a message for the screen; any other problem just keeps Save dull.
  */
-export function checkAmount(input: string, from?: Category): AmountCheck {
-  const piconero = parseXmr(input)
-  if (piconero === null || piconero <= 0n) return { problem: '' }
-  if (from && piconero > from.balance) {
-    return { problem: `${from.name} holds only ${formatXmr(from.balance)} XMR` }
+export function checkAmount(input: string, coin: Coin, from?: Category): AmountCheck {
+  const units = parseAmount(input, coin.decimals)
+  if (units === null || units <= 0n) return { problem: '' }
+  if (from && units > from.balance) {
+    return { problem: `${from.name} holds only ${formatAmount(from.balance, coin.decimals)} ${coin.ticker}` }
   }
-  return { piconero }
+  return { units }
 }
 
-/** The confirmation shown before a category is deleted. The XMR sentence is left out when it holds nothing. */
-export function deleteMessage(category: Category): string {
+/**
+ * The confirmation shown before a category is deleted. The sentence about money is left out when it holds nothing
+ * in the coin on screen, and always while no coin has been added.
+ */
+export function deleteMessage(category: Category, coin: Coin | null): string {
   const question = `Are you sure that you want to delete ${category.name}?`
-  return category.balance > 0n
-    ? `${question} ${formatXmr(category.balance)} XMR will be moved to Ready to Assign, and past transactions may become unassigned.`
+  return coin && category.balance > 0n
+    ? `${question} ${formatAmount(category.balance, coin.decimals)} ${coin.ticker} will be moved to Ready to Assign, and past transactions may become unassigned.`
     : `${question} Past transactions may become unassigned.`
 }
