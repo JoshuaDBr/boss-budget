@@ -26,7 +26,8 @@ function tabTransform(d: number) {
   return `translate(${(x - 35).toFixed(1)}px,${(y - 17).toFixed(1)}px) rotate(${angle.toFixed(2)}deg) scale(${scale.toFixed(3)})`
 }
 
-export default function CoinWheel() {
+/** With no coin added yet, the wheel is empty. */
+export default function CoinWheel({ empty }: { empty: boolean }) {
   const spokes = [-1, -0.6, -0.2, 0.2, 0.6, 1]
   return (
     <section id="arcC" className="comp" aria-label="Coin wheel (placeholder)">
@@ -50,7 +51,7 @@ export default function CoinWheel() {
         <path d={`M${CX - 8} 2 L${CX + 8} 2 L${CX} 12 Z`} fill="#4f7fa8" />
       </svg>
       <div id="arcTabs">
-        {COINS.map((coin, i) => {
+        {!empty && COINS.map((coin, i) => {
           const d = i - ACTIVE
           if (Math.abs(d) > 2) return null
           return (

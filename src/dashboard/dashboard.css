@@ -172,3 +172,25 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .pb.main { box-shadow: 2px 3px 0 var(--ink2); }
 .pb.main.dull:hover { background: #fff; }
 .pop-delete .pb.main:not(.dull), .pb.del { border-color: #a93226; color: #a93226; }
+
+/* V3: holdings rows with a 3-dot menu, the centered coin pop-ups and renaming in place */
+#holdC { overflow: visible; }
+.mrow { position: relative; padding-right: 22px; font-size: 15px; white-space: nowrap; }
+.dots { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 20px; height: 26px; padding: 0; border: 0; background: transparent; line-height: 1; }
+.dots svg { fill: var(--ink2); }
+.dotMenu { position: absolute; right: -86px; z-index: 8; border: 1.4px solid var(--ink); border-radius: 6px; background: #fff; box-shadow: 3px 4px 0 var(--ink3); }
+.dotMenu button { display: block; width: 90px; padding: 7px 12px; border: 0; background: #fff; font-size: 15px; text-align: left; color: #a93226; }
+.dotMenu button:hover { background: #f3f3ef; }
+.addCoin { font-size: 14px; color: var(--ink2); padding: 12px; text-align: center; align-items: center; }
+.midPop { left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10; width: 380px; padding: 14px 0 12px; box-shadow: 3px 4px 0 var(--ink3); }
+.midTitle { margin: 0; padding: 0 16px 10px; font-size: 20px; font-weight: normal; }
+.midBody { margin: 0; padding: 0 16px 12px; font-size: 16px; line-height: 1.35; }
+.coinList { list-style: none; margin: 0 12px; padding: 0; border: 1.4px solid var(--ink); border-radius: 6px; max-height: 420px; overflow: auto; }
+.coinList button { display: block; width: 100%; padding: 7px 12px; border: 0; border-bottom: 1px solid var(--ink3); background: #fff; font-size: 16px; text-align: left; }
+.coinList li:last-child button { border-bottom: 0; }
+.coinList button:hover { background: #f3f3ef; }
+.coinList button.sel { background: var(--accent-soft); }
+.typeBox { margin: 0 16px; }
+.typeHint { padding-bottom: 6px; font-size: 14px; color: var(--ink2); }
+.renameBox { width: 100%; border: 0; outline: 2.4px solid var(--ink); outline-offset: 4px; padding: 0; background: #fff; font: inherit; color: inherit; }
+.renameBox.bad { outline-color: #c0392b; }
