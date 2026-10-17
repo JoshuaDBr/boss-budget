@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatShort } from '../ledger/amount'
 import { COINS, type Coin } from '../ledger/coins'
+import { fitFont } from './fit'
 
 export interface Holding {
   coin: Coin
@@ -54,9 +55,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) 
         <div className="ttl">holdings</div>
         {holdings.map(({ coin, total }) => (
           <div key={coin.ticker} className="hrow mrow">
-            <span className={total < 0n ? 'neg' : undefined}>
-              {formatShort(total, coin.decimals)} {coin.ticker}
-            </span>
+            <Total text={`${formatShort(total, coin.decimals)} ${coin.ticker}`} negative={total < 0n} />
             <small>$-,--</small>
             <button
               type="button"
@@ -101,5 +100,15 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) 
         </div>
       )}
     </div>
+  )
+}
+
+/** A coin's total, shrunk to fit beside the 3-dot button when it is long. */
+function Total({ text, negative }: { text: string; negative: boolean }) {
+  const size = fitFont(text, 12, 18)
+  return (
+    <span className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
+      {text}
+    </span>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatAmount } from '../ledger/amount'
+import { fitFont } from './fit'
 import { MAX_NAME_LENGTH, READY_TO_ASSIGN, type Category } from '../ledger/ledger'
 import type { BookState } from '../useBook'
 import { isChoosable, type Mode } from './categoryMode'
@@ -88,7 +89,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
                       <td>{budget.coin ? '$-,--' : ''}</td>
-                      <td className={c.balance < 0n ? 'neg' : undefined}>{budget.coin ? formatAmount(c.balance, budget.coin.decimals) : ''}</td>
+                      <CoinCell text={budget.coin ? formatAmount(c.balance, budget.coin.decimals) : ''} negative={c.balance < 0n} />
                     </tr>
                   )
                 })
@@ -193,5 +194,15 @@ function RenameBox({ category, categories, onSave, onDone }: RenameProps) {
       }}
       onBlur={onDone}
     />
+  )
+}
+
+/** A coin amount in the table, shrunk to fit when it is long. */
+function CoinCell({ text, negative }: { text: string; negative: boolean }) {
+  const size = fitFont(text, 20, 19)
+  return (
+    <td className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
+      {text}
+    </td>
   )
 }

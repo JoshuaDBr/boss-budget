@@ -42,7 +42,7 @@ svg text { font-family: var(--hand); }
 table.bud { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.bud td { border-bottom: 1.2px solid var(--ink); padding: 0 14px; height: 44px; font-size: 19px; }
 table.bud td + td { border-left: 1.2px solid var(--ink); width: 170px; text-align: right; white-space: nowrap; }
-/* XMR shows all twelve decimal places, so its column is wider than USD. */
+/* A coin shows all its decimal places (up to 18 for ETH), so its column is wider than USD. */
 table.bud td + td + td { width: 230px; }
 table.bud td.cat small { color: var(--ink2); margin-left: 8px; font-size: 11px; }
 table.bud tr.ready td { background: #f8f7f1; }
@@ -145,7 +145,7 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .fld.num { justify-content: flex-end; }
 .fld.amt { justify-content: flex-end; overflow: hidden; white-space: nowrap; }
 .fld.amt.bad { color: #c0392b; }
-/* the full twelve-decimal amount box, laid over the whole entry line while typing */
+/* the full-precision amount box, laid over the whole entry line while typing */
 .popGrid > .fullAmt { position: absolute; top: 0; left: 12px; right: 12px; margin: 0; z-index: 1; display: flex; align-items: center; height: 36px; padding: 0 10px; border: 2.4px solid var(--accent); border-radius: 6px; background: #fff; box-shadow: 0 0 7px 1px rgba(79, 127, 168, 0.45); font-size: 17px; }
 .fullAmt input { width: 100%; border: 0; outline: 0; padding: 0; background: transparent; font: inherit; color: inherit; text-align: right; }
 .fullAmt.bad input { color: #c0392b; }
@@ -161,7 +161,7 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .fromList li[aria-selected='true'] button { background: var(--accent-soft); }
 .fromList .cat { flex: 1; }
 .fromList .usd { color: var(--ink3); }
-.fromList .xmr { width: 90px; text-align: right; }
+.fromList .amt { width: 90px; text-align: right; }
 /* Style A confirmation: the question replaces the fields */
 .question { padding: 10px 14px 6px; font-size: 18px; }
 .popFoot { display: flex; align-items: center; gap: 10px; padding: 12px 12px 0; }

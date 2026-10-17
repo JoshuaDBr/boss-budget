@@ -142,7 +142,7 @@ export default function Dashboard({ store }: { store: BookStore }) {
       )}
       <BudgetActions coin={coin} blocked={blocked ?? (coin ? null : 'Add a currency first')} onStart={edit} />
       <Filters />
-      <CoinWheel empty={coin === null} />
+      <CoinWheel coins={holdings.map(h => h.coin)} on={coin?.ticker ?? null} blocked={busy} onView={store.view} />
       <BossButton />
       <Corner snapshot={state.snapshot} coin={coin} view={view} blocked={state.error ?? busy} onSwap={() => setView(view === 'budget' ? 'history' : 'budget')} />
       {mode && state.snapshot && (

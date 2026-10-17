@@ -277,7 +277,7 @@ function FromList({ mode, coin, categories, onChange }: { mode: EditMode; coin: 
               <button type="button" onClick={() => onChange({ ...mode, from: c.id, listOpen: false, active: 'amount' })}>
                 <span className="cat">{c.name}</span>
                 <span className="usd">$-,--</span>
-                <span className={c.balance < 0n ? 'xmr neg' : 'xmr'}>{formatShort(c.balance, coin.decimals)}</span>
+                <span className={c.balance < 0n ? 'amt neg' : 'amt'}>{formatShort(c.balance, coin.decimals)}</span>
               </button>
             </li>
           ))}
@@ -361,16 +361,16 @@ function DateBox({ digits, active, onActivate, onChange, onEnter }: TextProps & 
 /** Style A: the question replaces the fields, and the pop-up keeps its title. */
 function Question({ mode, coin, amount }: { mode: EntryMode; coin: Coin; amount: bigint }) {
   const verb = mode.kind === 'edit' ? (mode.spend ? 'spend' : 'deposit') : mode.kind
-  const xmr = <strong>{formatAmount(amount, coin.decimals)} {coin.ticker}</strong>
+  const shown = <strong>{formatAmount(amount, coin.decimals)} {coin.ticker}</strong>
   return (
     <div className="question">
       {mode.confirm === 'delete' ? (
         <>
-          Delete this {verb} of {xmr}?
+          Delete this {verb} of {shown}?
         </>
       ) : (
         <>
-          Did you {verb} precisely {xmr}?
+          Did you {verb} precisely {shown}?
         </>
       )}
     </div>

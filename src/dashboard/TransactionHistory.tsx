@@ -1,6 +1,7 @@
 import { isoToUs } from '../ledger/dates'
 import type { Category, Snapshot, Transaction } from '../ledger/ledger'
 import { formatAmount, formatShort } from '../ledger/amount'
+import { fitFont } from './fit'
 import type { Coin } from '../ledger/coins'
 
 // The history and the budget trade places. Normally the budget is in the central box and the corner shows the mini
@@ -39,14 +40,14 @@ export function Corner({ snapshot, coin, view, blocked, onSwap }: CornerProps) {
                     <td className="date">{isoToUs(t.date)}</td>
                     <td className="note">{t.note}</td>
                     <td className="usd muted">$-,--</td>
-                    <td className="num">{sign(t)}{formatShort(t.amount, decimals)}</td>
+                    <MiniAmount text={`${sign(t)}${formatShort(t.amount, decimals)}`} negative={false} />
                   </tr>
                 ))
               : snapshot?.categories.map(c => (
                   <tr key={c.id}>
                     <td className="note">{c.name}</td>
                     <td className="usd muted">$-,--</td>
-                    <td className={c.balance < 0n ? 'num neg' : 'num'}>{coin ? formatShort(c.balance, decimals) : ''}</td>
+                    <MiniAmount text={coin ? formatShort(c.balance, decimals) : ''} negative={c.balance < 0n} />
                   </tr>
                 ))}
           </tbody>
@@ -84,6 +85,8 @@ export function HistoryTable({ snapshot, coin, editable, onEdit }: HistoryProps)
           <tbody>
             {newestFirst(snapshot.transactions).map(t => {
               const category = categoryOf(t, snapshot.categories)
+              const amount = `${sign(t)}${formatAmount(t.amount, coin?.decimals ?? 0)}`
+              const size = fitFont(amount, 19, 16)
               return (
                 <tr key={t.id} className={editable ? 'choosable' : undefined} onClick={editable ? () => onEdit(t) : undefined}>
                   <td className="date">{isoToUs(t.date)}</td>
@@ -92,7 +95,7 @@ export function HistoryTable({ snapshot, coin, editable, onEdit }: HistoryProps)
                     {t.kind === 'deposit' ? 'Ready to Assign' : category ? category.name : <span className="unassigned">Unassigned</span>}
                   </td>
                   <td>$-,--</td>
-                  <td>{sign(t)}{formatAmount(t.amount, coin?.decimals ?? 0)}</td>
+                  <td style={size ? { fontSize: size } : undefined}>{amount}</td>
                 </tr>
               )
             })}
@@ -107,5 +110,15 @@ export function HistoryTable({ snapshot, coin, editable, onEdit }: HistoryProps)
         <div className="c3">{coin?.ticker ?? 'Crypto'}</div>
       </div>
     </section>
+  )
+}
+
+/** An amount in the corner box, shrunk to fit its narrow column when it is long. */
+function MiniAmount({ text, negative }: { text: string; negative: boolean }) {
+  const size = fitFont(text, 9, 14)
+  return (
+    <td className={negative ? 'num neg' : 'num'} style={size ? { fontSize: size } : undefined}>
+      {text}
+    </td>
   )
 }
