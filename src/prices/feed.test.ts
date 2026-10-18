@@ -97,6 +97,18 @@ describe('the queue', () => {
     expect(new Set(sent.map(s => s.url)).size).toBe(13)
   })
 
+  it('a switched-to coin waits behind prices that have not been sent', async () => {
+    const { sent, get } = fake(ok)
+    const feed = new Feed(get)
+    feed.launch(launchJobs(['XMR', 'ZEC'], 'XMR'))
+    feed.prioritize('ZEC')
+    await vi.runAllTimersAsync()
+    expect(sent[0].url).not.toContain('market_chart')
+    expect(tickerOf(sent[1].url)).toBe('ZEC')
+    expect(tickerOf(sent[2].url)).toBe('XMR')
+    expect(sent).toHaveLength(13)
+  })
+
   it('a refresh cannot start while another is running', async () => {
     const { sent, get } = fake(ok)
     const feed = new Feed(get)

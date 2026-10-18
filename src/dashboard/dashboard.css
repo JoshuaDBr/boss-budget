@@ -18,16 +18,18 @@ svg text { font-family: var(--hand); }
 #refreshBtn[aria-disabled] { cursor: default; }
 #updated { font-size: 11px; color: var(--ink2); white-space: nowrap; position: absolute; top: 118px; left: 0; width: 150px; }
 
-/* price chart (placeholder) */
+/* price graph */
 #chartC { left: 190px; top: 18px; width: 800px; height: 190px; padding: 6px; }
 #chart { width: 100%; height: 100%; display: block; }
 
-/* day-range wheel (placeholder) */
+/* 30 / 60 / 90 day disc */
 #pieC { left: 1030px; top: 8px; width: 230px; height: 218px; }
 #pie { width: 230px; height: 200px; display: block; }
 #pie .wedge path { fill: #fff; stroke: var(--ink); stroke-width: 1.6; }
 #pie .wedge.sel path { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.4; }
 #pie .wedge text { font-size: 26px; fill: var(--ink); }
+#pie .wedge { cursor: pointer; outline: none; }
+#pie .wedge:focus-visible path { stroke: var(--accent); stroke-width: 2.4; }
 #pieCap { text-align: center; font-size: 12px; color: var(--ink2); margin-top: -6px; }
 
 /* holdings */

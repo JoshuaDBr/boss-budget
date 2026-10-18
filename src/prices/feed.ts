@@ -106,12 +106,14 @@ export class Feed {
     return true
   }
 
-  /** Moves a coin's waiting graph to the front of the queue. The spacing does not change. */
+  /** Moves a coin's waiting graph to the front of the queue, behind the prices if they are still waiting. The spacing
+   * does not change. */
   prioritize(ticker: string) {
     const i = this.queue.findIndex(j => j.kind === 'graph' && j.ticker === ticker)
-    if (i <= 0) return
+    const front = this.queue[0]?.kind === 'prices' ? 1 : 0
+    if (i <= front) return
     const [job] = this.queue.splice(i, 1)
-    this.queue.unshift(job)
+    this.queue.splice(front, 0, job)
     this.publish()
   }
 

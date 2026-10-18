@@ -18,6 +18,8 @@ import Holdings from './Holdings'
 import PriceChart from './PriceChart'
 import Refresh, { FailedPopup } from './Refresh'
 import { PricesContext, feed, useFeed } from '../prices/prices'
+import { coinRefreshJobs, launchJobs } from '../prices/feed'
+import type { Range } from './graph'
 import { Corner, HistoryTable } from './TransactionHistory'
 import './dashboard.css'
 
@@ -33,8 +35,18 @@ export default function Dashboard({ store }: { store: BookStore }) {
   const [view, setView] = useState<'budget' | 'history'>('budget')
   const prices = useFeed()
   const today = useMemo(() => Object.fromEntries(Object.entries(prices.prices).map(([t, p]) => [t, p.price])), [prices.prices])
+  // The graphs always open at 90 days.
+  const [range, setRange] = useState<Range>(90)
   // The launch queue starts once, when the app opens.
-  useEffect(() => feed.launch([{ kind: 'prices' }]), [])
+  useEffect(() => {
+    if (state.book) feed.launch(launchJobs(addedCoins(state.book).map(c => c.ticker), state.coin?.ticker ?? null))
+    else feed.launch(launchJobs([], null))
+  }, [])
+  // A coin whose graph is still waiting moves to the front of the queue when it comes on screen.
+  const ticker = state.coin?.ticker ?? null
+  useEffect(() => {
+    if (ticker) feed.prioritize(ticker)
+  }, [ticker])
 
   const coin = state.coin ?? null
   const change = mode && state.snapshot ? pendingChange(mode, state.snapshot.categories, coin) : null
@@ -118,9 +130,12 @@ export default function Dashboard({ store }: { store: BookStore }) {
     <PricesContext.Provider value={today}>
     <main id="stage">
       <h1 className="sr">Boss Budget</h1>
-      <Refresh feed={prices} onRefresh={() => feed.refresh([{ kind: 'prices' }])} />
-      <PriceChart coin={coin} />
-      <DayRangeWheel />
+      <Refresh feed={prices} onRefresh={() => feed.refresh(coinRefreshJobs(ticker))} />
+      <PriceChart
+        line={coin && { ticker: coin.ticker, points: prices.graphs[coin.ticker], waiting: prices.waiting.includes(coin.ticker), price: today[coin.ticker] ?? null }}
+        range={range}
+      />
+      <DayRangeWheel range={range} onRange={setRange} />
       <Holdings
         holdings={holdings}
         blocked={state.error ? 'The saved budget could not be read, so it cannot be changed' : busy}
