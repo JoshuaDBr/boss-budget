@@ -10,10 +10,12 @@ small { font-size: 11px; }
 svg text { font-family: var(--hand); }
 #stage button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* refresh (placeholder) */
+/* refresh: the icon, or the countdown while prices are on their way */
 #refresh { left: 20px; top: 20px; width: 110px; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
 #refreshBtn { width: 84px; height: 84px; border: 1.6px solid var(--ink); border-radius: 14px 9px 16px 8px; display: flex; align-items: center; justify-content: center; background: #fff; }
 #refreshBtn svg { width: 60px; height: 60px; }
+.countdown { font-size: 30px; line-height: 1; color: var(--ink); }
+#refreshBtn[aria-disabled] { cursor: default; }
 #updated { font-size: 11px; color: var(--ink2); white-space: nowrap; position: absolute; top: 118px; left: 0; width: 150px; }
 
 /* price chart (placeholder) */
@@ -93,9 +95,9 @@ table.bud td.empty { height: auto; padding: 30px; text-align: center; color: var
 table.tx { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table.tx td { border-bottom: 1.2px solid var(--ink); height: 37px; padding: 0 6px; font-size: 14px; white-space: nowrap; overflow: hidden; }
 table.tx td + td { border-left: 1.2px solid var(--ink); }
-table.tx td.date { width: 84px; }
+table.tx td.date { width: 82px; }
 table.tx td.note { text-overflow: ellipsis; }
-table.tx td.usd { width: 44px; text-align: right; }
+table.tx td.usd { width: 78px; text-align: right; }
 table.tx td.num { width: 76px; text-align: right; }
 #txArrowC { left: 1078px; top: 750px; }
 
@@ -108,12 +110,12 @@ table.bud.hist td + td { width: auto; text-align: left; }
 table.bud.hist td.date { width: 104px; }
 table.bud.hist td.note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 table.bud.hist td.hcat { width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-table.bud.hist td:nth-child(4) { width: 70px; text-align: right; }
+table.bud.hist td:nth-child(4) { width: 100px; text-align: right; }
 table.bud.hist td:nth-child(5) { width: 190px; text-align: right; }
 .tfoot.hist .c1 { flex: none; width: 104px; }
 .tfoot.hist .c1.note { flex: 1; width: auto; border-left: 1.2px solid var(--ink); }
 .tfoot.hist .c1.hcat { width: 140px; border-left: 1.2px solid var(--ink); }
-.tfoot.hist .c2 { width: 70px; }
+.tfoot.hist .c2 { width: 100px; }
 .tfoot.hist .c3 { width: 190px; }
 
 /* category choosing (Move and Delete) */
@@ -146,9 +148,6 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .fld.amt { justify-content: flex-end; overflow: hidden; white-space: nowrap; }
 .fld.amt.bad { color: #c0392b; }
 /* the full-precision amount box, laid over the whole entry line while typing */
-.popGrid > .fullAmt { position: absolute; top: 0; left: 12px; right: 12px; margin: 0; z-index: 1; display: flex; align-items: center; height: 36px; padding: 0 10px; border: 2.4px solid var(--accent); border-radius: 6px; background: #fff; box-shadow: 0 0 7px 1px rgba(79, 127, 168, 0.45); font-size: 17px; }
-.fullAmt input { width: 100%; border: 0; outline: 0; padding: 0; background: transparent; font: inherit; color: inherit; text-align: right; }
-.fullAmt.bad input { color: #c0392b; }
 .fld.usd { color: var(--ink3); background: #fafaf7; }
 .fld.wide { grid-column: span 2; }
 .fld input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; font: inherit; color: inherit; }
@@ -194,3 +193,8 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .typeHint { padding-bottom: 6px; font-size: 14px; color: var(--ink2); }
 .renameBox { width: 100%; border: 0; outline: 2.4px solid var(--ink); outline-offset: 4px; padding: 0; background: #fff; font: inherit; color: inherit; }
 .renameBox.bad { outline-color: #c0392b; }
+
+/* V4: dollar values */
+.fld.amt input { text-align: right; }
+/* the failed-refresh pop-up: small, centered, gone after 3 seconds */
+#offline { left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 12; width: 300px; padding: 16px 20px; font-size: 16px; text-align: center; line-height: 1.35; box-shadow: 3px 4px 0 var(--ink3); }

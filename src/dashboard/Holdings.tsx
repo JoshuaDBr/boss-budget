@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { formatShort } from '../ledger/amount'
 import { COINS, type Coin } from '../ledger/coins'
 import { fitFont } from './fit'
+import { useDollars } from '../prices/prices'
+import Usd from './Usd'
 
 export interface Holding {
   coin: Coin
@@ -22,6 +24,7 @@ interface Props {
  */
 export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) {
   const [menu, setMenu] = useState<{ ticker: string; top: number } | null>(null)
+  const dollars = useDollars()
   const box = useRef<HTMLElement>(null)
   const full = holdings.length === COINS.length
 
@@ -56,7 +59,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) 
         {holdings.map(({ coin, total }) => (
           <div key={coin.ticker} className="hrow mrow">
             <Total text={`${formatShort(total, coin.decimals)} ${coin.ticker}`} negative={total < 0n} />
-            <small>$-,--</small>
+            <small><Usd value={dollars(total, coin.ticker)} muted /></small>
             <button
               type="button"
               className={blocked ? 'dots dull' : 'dots'}

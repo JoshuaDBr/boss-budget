@@ -6,6 +6,8 @@ import type { BookState } from '../useBook'
 import { isChoosable, type Mode } from './categoryMode'
 import { nameProblem } from './categoryRules'
 import { placeholder } from './placeholder'
+import { useDollars } from '../prices/prices'
+import Usd from './Usd'
 
 interface Props {
   budget: BookState
@@ -32,6 +34,7 @@ function chosenAs(mode: Mode | null, id: string): string | null {
 
 export default function CategoriesTable({ budget, mode, onChoose, onName, onSaveName, renamable, onRename }: Props) {
   const nameBox = useRef<HTMLInputElement>(null)
+  const dollars = useDollars()
   const adding = mode?.kind === 'add'
   const [renaming, setRenaming] = useState<string | null>(null)
   const hold = useRef<number | undefined>(undefined)
@@ -88,7 +91,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {c.id === READY_TO_ASSIGN && <small>deposits land here</small>}
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
-                      <td>{budget.coin ? '$-,--' : ''}</td>
+                      <td>{budget.coin ? <Usd value={dollars(c.balance, budget.coin.ticker)} /> : ''}</td>
                       <CoinCell text={budget.coin ? formatAmount(c.balance, budget.coin.decimals) : ''} negative={c.balance < 0n} />
                     </tr>
                   )
@@ -118,7 +121,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                       onKeyDown={e => e.key === 'Enter' && onSaveName()}
                     />
                   </td>
-                  <td>{budget.coin ? '$-,--' : ''}</td>
+                  <td>{budget.coin ? <Usd value={dollars(0n, budget.coin.ticker)} /> : ''}</td>
                   <td>{budget.coin ? 0 : ''}</td>
                 </tr>
               )}

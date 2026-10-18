@@ -1,10 +1,18 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { formatDateDigits } from '../ledger/dates'
 import { formatAmount, formatShort, isAmountDraft, parseAmount } from '../ledger/amount'
 import type { Coin } from '../ledger/coins'
 import { MAX_NOTE_LENGTH, type Category, type Snapshot } from '../ledger/ledger'
 import { editableFrom, entryDate, nextField, type EditMode, type EntryMode, type Mode, type MoveField, type MoveMode, type SpendField, type SpendMode } from './categoryMode'
 import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
+import { useDollars } from '../prices/prices'
+import Usd from './Usd'
+
+/** The dollar box: the typed coin amount at today's price. An empty amount is $0.00; one still being typed, $-,--. */
+function typedDollars(amount: string, coin: Coin, dollars: ReturnType<typeof useDollars>) {
+  const units = amount.trim() === '' ? 0n : parseAmount(amount, coin.decimals)
+  return units === null ? null : dollars(units, coin.ticker)
+}
 
 // The Add, Move, Delete, Deposit, Spend and Edit pop-up. It is as wide as the categories table and sits just below it,
 // over the wheel area, so nothing underneath has to move.
@@ -159,13 +167,14 @@ interface MoveProps {
 }
 
 function MoveFields({ mode, coin, fromName, toName, problem, ready, onChange, onSave }: MoveProps) {
+  const dollars = useDollars()
   const activate = (active: MoveField) => mode.active !== active && onChange({ ...mode, active })
 
   return (
     <div className="popGrid">
       <Field label="From" value={fromName} active={mode.active === 'from'} onFocus={() => activate('from')} />
-      <div className="fld num usd" aria-label="US dollars (not available yet)">
-        $-,--
+      <div className="fld num usd" aria-label="US dollars">
+        <Usd value={typedDollars(mode.amount, coin, dollars)} />
       </div>
       <AmountBox
         label={`${coin.ticker} to move`}
@@ -197,6 +206,7 @@ interface EntryProps {
  * then Note and Date.
  */
 function EntryFields({ mode, coin, snapshot, problem, ready, onChange, onSave }: EntryProps) {
+  const dollars = useDollars()
   // Moving to another field closes Edit spend's From list.
   const activate = (active: SpendField) =>
     mode.active !== active && onChange({ ...mode, active, ...(mode.kind === 'edit' && { listOpen: false }) } as Mode)
@@ -217,8 +227,8 @@ function EntryFields({ mode, coin, snapshot, problem, ready, onChange, onSave }:
       ) : (
         <div />
       )}
-      <div className="fld num usd" aria-label="US dollars (not available yet)">
-        $-,--
+      <div className="fld num usd" aria-label="US dollars">
+        <Usd value={typedDollars(mode.amount, coin, dollars)} />
       </div>
       <AmountBox
         label={`${coin.ticker} to ${mode.kind === 'edit' ? (mode.spend ? 'spend' : 'deposit') : mode.kind}`}
@@ -253,6 +263,7 @@ function EntryFields({ mode, coin, snapshot, problem, ready, onChange, onSave }:
  * dollar amount and its amount in the coin to six decimal places, cut. A spend whose category was deleted shows "Unassigned" in red.
  */
 function FromList({ mode, coin, categories, onChange }: { mode: EditMode; coin: Coin; categories: readonly Category[]; onChange: (mode: Mode) => void }) {
+  const dollars = useDollars()
   const from = categories.find(c => c.id === mode.from)
   const choices = editableFrom(categories)
   const box = useFocusWhen(mode.active === 'from')
@@ -276,7 +287,7 @@ function FromList({ mode, coin, categories, onChange }: { mode: EditMode; coin: 
             <li key={c.id} role="option" aria-selected={c.id === mode.from}>
               <button type="button" onClick={() => onChange({ ...mode, from: c.id, listOpen: false, active: 'amount' })}>
                 <span className="cat">{c.name}</span>
-                <span className="usd">$-,--</span>
+                <span className="usd"><Usd value={dollars(c.balance, coin.ticker)} /></span>
                 <span className={c.balance < 0n ? 'amt neg' : 'amt'}>{formatShort(c.balance, coin.decimals)}</span>
               </button>
             </li>
@@ -389,56 +400,27 @@ interface AmountProps {
 }
 
 /**
- * The amount, in the coin on screen. The box in the row shows six decimal places, cut. Typing happens in a full box
- * laid over the entry line, which opens whenever the amount gets the cursor and shows every place the coin has. On
- * leaving it, a valid amount is written out to every place, so digits past the sixth read as zeros until changed.
+ * The amount, in the coin on screen, typed straight into the row's box. It shows every place the coin has; an amount
+ * too long for the box scrolls inside it, like any text box. On leaving it, a valid amount is written out to every
+ * place, so digits past those typed read as zeros until changed.
  */
 function AmountBox({ label, coin, value, active, problem, onActivate, onChange, onEnter }: AmountProps) {
-  const [open, setOpen] = useState(active)
-  const fullBox = useRef<HTMLInputElement>(null)
+  const box = useFocusWhen<HTMLInputElement>(active)
   const units = parseAmount(value, coin.decimals)
-
-  // When the emphasis reaches the amount, the full box opens with the cursor in it.
-  useEffect(() => {
-    if (active) setOpen(true)
-  }, [active])
-  useEffect(() => {
-    if (open && active) fullBox.current?.focus()
-  }, [open, active])
-
-  const close = () => {
-    setOpen(false)
-    if (units !== null) onChange(formatAmount(units, coin.decimals))
-  }
-
   return (
-    <>
-      <button
-        type="button"
-        className={`fld num amt${active ? ' on' : ''}${problem ? ' bad' : ''}`}
+    <label className={`fld num amt${active ? ' on' : ''}${problem ? ' bad' : ''}`}>
+      <input
+        ref={box}
         aria-label={label}
-        onClick={() => {
-          onActivate()
-          setOpen(true)
-        }}
-      >
-        {units === null ? value : formatShort(units, coin.decimals)}
-      </button>
-      {open && active && (
-        <label className={problem ? 'fullAmt bad' : 'fullAmt'}>
-          <input
-            ref={fullBox}
-            aria-label={label}
-            inputMode="decimal"
-            autoComplete="off"
-            value={value}
-            onChange={e => isAmountDraft(e.target.value, coin.decimals) && onChange(e.target.value)}
-            onBlur={close}
-            onKeyDown={e => e.key === 'Enter' && onEnter()}
-          />
-        </label>
-      )}
-    </>
+        inputMode="decimal"
+        autoComplete="off"
+        value={value}
+        onFocus={() => !active && onActivate()}
+        onChange={e => isAmountDraft(e.target.value, coin.decimals) && onChange(e.target.value)}
+        onBlur={() => units !== null && onChange(formatAmount(units, coin.decimals))}
+        onKeyDown={e => e.key === 'Enter' && onEnter()}
+      />
+    </label>
   )
 }
 

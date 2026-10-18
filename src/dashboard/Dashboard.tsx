@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Category, Transaction } from '../ledger/ledger'
 import { formatAmount } from '../ledger/amount'
 import { addedCoins } from '../ledger/book'
@@ -16,7 +16,8 @@ import DayRangeWheel from './DayRangeWheel'
 import Filters from './Filters'
 import Holdings from './Holdings'
 import PriceChart from './PriceChart'
-import Refresh from './Refresh'
+import Refresh, { FailedPopup } from './Refresh'
+import { PricesContext, feed, useFeed } from '../prices/prices'
 import { Corner, HistoryTable } from './TransactionHistory'
 import './dashboard.css'
 
@@ -30,6 +31,10 @@ export default function Dashboard({ store }: { store: BookStore }) {
   const [error, setError] = useState<string | null>(null)
   // Which view is in the central box. The other one shows in the corner.
   const [view, setView] = useState<'budget' | 'history'>('budget')
+  const prices = useFeed()
+  const today = useMemo(() => Object.fromEntries(Object.entries(prices.prices).map(([t, p]) => [t, p.price])), [prices.prices])
+  // The launch queue starts once, when the app opens.
+  useEffect(() => feed.launch([{ kind: 'prices' }]), [])
 
   const coin = state.coin ?? null
   const change = mode && state.snapshot ? pendingChange(mode, state.snapshot.categories, coin) : null
@@ -110,9 +115,10 @@ export default function Dashboard({ store }: { store: BookStore }) {
     : (busy ?? (view === 'history' ? 'Swap the budget back to the center first' : null))
 
   return (
+    <PricesContext.Provider value={today}>
     <main id="stage">
       <h1 className="sr">Boss Budget</h1>
-      <Refresh />
+      <Refresh feed={prices} onRefresh={() => feed.refresh([{ kind: 'prices' }])} />
       <PriceChart coin={coin} />
       <DayRangeWheel />
       <Holdings
@@ -172,6 +178,8 @@ export default function Dashboard({ store }: { store: BookStore }) {
           onCancel={cancel}
         />
       )}
+      <FailedPopup failures={prices.failures} />
     </main>
+    </PricesContext.Provider>
   )
 }
