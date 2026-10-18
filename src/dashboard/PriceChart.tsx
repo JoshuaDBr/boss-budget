@@ -1,8 +1,9 @@
 import { lastDays } from '../prices/coingecko'
 import { usd5 } from '../prices/money'
-import { COLORS, DAY_LABELS, GRID_DECIMALS, gridLabel, niceTicks, type Range } from './graph'
+import { COLORS, DAY_LABELS, GRID_DECIMALS, gridLabel, niceTicks, nudge, percentChange, type Range } from './graph'
 
-// The price graph: the featured coin's real price over the chosen range, in the coin's color.
+// The price graph: the featured coin's real price over the chosen range, in the coin's color. In the Boss View, one
+// line per coin added, each showing its percent change from the first day of the range.
 const W = 788, H = 178, PAD_T = 12, PAD_B = 24
 
 export interface GraphLine {
@@ -14,11 +15,18 @@ export interface GraphLine {
   price: number | null
 }
 
+interface Props {
+  line: GraphLine | null
+  /** In the Boss View: every coin added. Null on a coin's dashboard. */
+  boss: GraphLine[] | null
+  range: Range
+}
+
 /** With no coin added yet, the graph is blank. */
-export default function PriceChart({ line, range }: { line: GraphLine | null; range: Range }) {
+export default function PriceChart({ line, boss, range }: Props) {
   return (
-    <section id="chartC" className="comp box" aria-label="Price graph">
-      {line && <CoinGraph line={line} range={range} />}
+    <section id="chartC" className="comp box" aria-label={boss ? 'Boss graph' : 'Price graph'}>
+      {boss ? <BossGraph lines={boss} range={range} /> : line && <CoinGraph line={line} range={range} />}
     </section>
   )
 }
@@ -59,6 +67,55 @@ function CoinGraph({ line, range }: { line: GraphLine; range: Range }) {
     </svg>
   )
 }
+
+/** How far apart, in px, the labels at the ends of the Boss graph's lines are kept. */
+const GAP = 13
+
+function BossGraph({ lines, range }: { lines: GraphLine[]; range: Range }) {
+  const L = 58, R = 128
+  // Lines appear as their graphs arrive.
+  const series = lines.flatMap(l => (l.points ? [{ ...l, pct: percentChange(lastDays(l.points, range)) }] : []))
+  let body
+  if (!series.length) {
+    body = <Note left={L} right={R} text={lines.some(l => l.waiting) ? 'loading' : 'Failed to load.'} />
+  } else {
+    const values = series.flatMap(s => s.pct).concat(0)
+    const lo0 = Math.min(...values), hi0 = Math.max(...values), pad = (hi0 - lo0) * 0.08 || 1
+    const lo = lo0 - pad, hi = hi0 + pad
+    const ticks = niceTicks(lo, hi, 1)
+    const n = range + 1
+    const x = (i: number) => L + (i * (W - L - R)) / (n - 1)
+    const y = (v: number) => PAD_T + (1 - (v - lo) / (hi - lo)) * (H - PAD_T - PAD_B)
+    const labelYs = nudge(series.map(s => y(s.pct[s.pct.length - 1])), GAP, PAD_T - 2, H - PAD_B + 4)
+    body = (
+      <>
+        {ticks.map(t => (
+          <g key={t}>
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke={t === 0 ? '#bbb' : '#ddd'} strokeDasharray={t === 0 ? undefined : '3 5'} />
+            <text x={L - 6} y={y(t) + 3.5} textAnchor="end" fontSize="10" fill="#888">{percentLabel(t)}</text>
+          </g>
+        ))}
+        {series.map(s => (
+          <path key={s.ticker} d={path(s.pct, x, y)} fill="none" stroke={COLORS[s.ticker]} strokeWidth="1.8" strokeLinejoin="round" />
+        ))}
+        {series.map((s, i) => (
+          <text key={s.ticker} x={W - R + 6} y={labelYs[i] + 4} fontSize="11" fontWeight="bold" fill={COLORS[s.ticker]}>
+            {s.ticker} {s.price === null ? '$-,--' : usd5(s.price)}
+          </text>
+        ))}
+      </>
+    )
+  }
+  return (
+    <svg id="chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`Boss graph: percent change per coin, ${range} days`}>
+      {body}
+      <Axes left={L} right={R} range={range} />
+    </svg>
+  )
+}
+
+/** +400%, 0%, -20%. */
+const percentLabel = (value: number) => `${value > 0 ? '+' : ''}${value.toLocaleString('en-US')}%`
 
 const path = (values: readonly number[], x: (i: number) => number, y: (v: number) => number) =>
   values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')

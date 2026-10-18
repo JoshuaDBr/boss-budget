@@ -3,6 +3,7 @@ import { formatShort } from '../ledger/amount'
 import { COINS, type Coin } from '../ledger/coins'
 import { fitFont } from './fit'
 import { useDollars } from '../prices/prices'
+import { sumDollars } from '../prices/money'
 import Usd from './Usd'
 
 export interface Holding {
@@ -16,13 +17,15 @@ interface Props {
   blocked: string | null
   onAdd: () => void
   onDelete: (ticker: string) => void
+  /** In the Boss View, a grand total in dollars follows the last coin. */
+  boss: boolean
 }
 
 /**
  * One row per added coin, in ticker order, then "+ Add a Currency". Each row's 3-dot button opens a menu whose only
  * option is Delete. The box scrolls, so the menu is drawn outside it, level with its row.
  */
-export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) {
+export default function Holdings({ holdings, blocked, onAdd, onDelete, boss }: Props) {
   const [menu, setMenu] = useState<{ ticker: string; top: number } | null>(null)
   const dollars = useDollars()
   const box = useRef<HTMLElement>(null)
@@ -78,6 +81,12 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) 
             </button>
           </div>
         ))}
+        {boss && (
+          <div className="hrow grand">
+            <small>total</small>
+            <Usd value={sumDollars(holdings.map(h => dollars(h.total, h.coin.ticker)))} />
+          </div>
+        )}
         <button
           type="button"
           className={blocked || full ? 'hrow addCoin dull' : 'hrow addCoin'}
