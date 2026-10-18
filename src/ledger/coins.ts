@@ -17,7 +17,7 @@ export const COINS: readonly Coin[] = [
   { ticker: 'FIRO', name: 'Firo', decimals: 8 },
   { ticker: 'SOL', name: 'Solana', decimals: 9 }, // lamport
   { ticker: 'XMR', name: 'Monero', decimals: 12 }, // piconero
-  { ticker: 'XRP', name: 'Ripple', decimals: 6 }, // drop
+  { ticker: 'XRP', name: 'XRP', decimals: 6 }, // drop
   { ticker: 'XTM', name: 'Tari', decimals: 6 }, // microMinotari
   { ticker: 'ZANO', name: 'Zano', decimals: 12 },
   { ticker: 'ZEC', name: 'Zcash', decimals: 8 }, // zatoshi

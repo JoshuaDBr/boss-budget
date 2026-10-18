@@ -11,7 +11,7 @@ describe('coins', () => {
   it('lists them alphabetically by full name for Add a Currency', () => {
     expect(byName(COINS).map(coinLabel)).toEqual([
       'Bitcoin (BTC)', 'Bitcoin Cash (BCH)', 'Dash (DASH)', 'Ethereum (ETH)', 'Firo (FIRO)', 'Monero (XMR)',
-      'Pirate Chain (ARRR)', 'Ripple (XRP)', 'Solana (SOL)', 'Tari (XTM)', 'Zano (ZANO)', 'Zcash (ZEC)',
+      'Pirate Chain (ARRR)', 'Solana (SOL)', 'Tari (XTM)', 'XRP (XRP)', 'Zano (ZANO)', 'Zcash (ZEC)',
     ])
   })
 
