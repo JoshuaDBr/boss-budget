@@ -11,6 +11,7 @@ V3, "Multi-Coin", per the V3 PRD.
 - The wheel shows the coin on screen in the centre, with its neighbours on the side tabs and the ‹ › arrows.
 - Holding a category name for half a second renames it, in every coin at once.
 - Holdings and the corner box show six decimal places, cut, not rounded. The table, the pop-ups and the full history show every place; long amounts shrink to fit.
+- XRP shows its full name as "Ripple" ("Ripple (XRP)").
 
 ## 0.2.1 (2026-10-15)
 
