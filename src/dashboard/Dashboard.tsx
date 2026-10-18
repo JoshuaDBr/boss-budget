@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Category, Transaction } from '../ledger/ledger'
-import { formatXmr } from '../ledger/piconero'
-import type { BudgetStore } from '../useBudget'
+import { formatAmount } from '../ledger/amount'
+import { addedCoins } from '../ledger/book'
+import { renameCategory, snapshot } from '../ledger/ledger'
+import type { BookStore } from '../useBook'
 import BossButton from './BossButton'
 import BudgetActions from './BudgetActions'
 import CategoriesTable from './CategoriesTable'
 import CategoryActions from './CategoryActions'
 import CategoryPopup from './CategoryPopup'
-import { choose, confirmsSave, deleteChange, pendingChange, startEdit, type Mode } from './categoryMode'
+import { choose, confirmsSave, deleteChange, pendingChange, scopeOf, startEdit, type Mode } from './categoryMode'
+import CoinPopup, { type CoinPop } from './CoinPopups'
 import CoinWheel from './CoinWheel'
 import DayRangeWheel from './DayRangeWheel'
 import Filters from './Filters'
@@ -19,20 +22,28 @@ import './dashboard.css'
 
 // Desktop layout: a fixed 1280 x 800 stage. Every component is absolutely
 // positioned, so adding or resizing one never moves another.
-export default function Dashboard({ store }: { store: BudgetStore }) {
+export default function Dashboard({ store }: { store: BookStore }) {
   const { state, update } = store
   const [mode, setMode] = useState<Mode | null>(null)
+  // Add a Currency and Delete a coin: centered pop-ups of their own, outside the category modes.
+  const [coinPop, setCoinPop] = useState<CoinPop | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Which view is in the central box. The other one shows in the corner.
   const [view, setView] = useState<'budget' | 'history'>('budget')
 
-  const change = mode && state.snapshot ? pendingChange(mode, state.snapshot.categories) : null
+  const coin = state.coin ?? null
+  const change = mode && state.snapshot ? pendingChange(mode, state.snapshot.categories, coin) : null
   const cancel = () => {
     setMode(null)
+    setCoinPop(null)
     setError(null)
   }
+  const coinDone = (refused: string | null) => {
+    if (refused) setError(refused)
+    else cancel()
+  }
   const record = (apply: NonNullable<typeof change>) => {
-    const refused = update(apply)
+    const refused = mode ? update(apply, scopeOf(mode)) : null
     if (refused) setError(refused)
     else cancel()
   }
@@ -52,11 +63,11 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
   }
 
   // Escape is the same as Cancel in every pop-up.
-  const latest = useRef({ mode, cancel })
-  latest.current = { mode, cancel }
+  const latest = useRef({ open: false, cancel })
+  latest.current = { open: mode !== null || coinPop !== null, cancel }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && latest.current.mode) latest.current.cancel()
+      if (e.key === 'Escape' && latest.current.open) latest.current.cancel()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -65,6 +76,8 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
   // While a new category is being named, only the name box, Save and Cancel respond to clicks.
   // With the box still empty, a click anywhere else is the same as Cancel.
   const adding = mode?.kind === 'add'
+  const latestMode = useRef<{ name: string } | null>(null)
+  latestMode.current = mode?.kind === 'add' ? mode : null
   useEffect(() => {
     if (!adding) return
     const allowed = (e: Event) => e.target instanceof Element && e.target.closest('[data-naming]') !== null
@@ -76,8 +89,7 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
     const click = (e: Event) => {
       if (allowed(e)) return
       hold(e)
-      const current = latest.current.mode
-      if (current?.kind === 'add' && !current.name.trim()) latest.current.cancel()
+      if (!latestMode.current?.name.trim()) latest.current.cancel()
     }
     const options = { capture: true }
     window.addEventListener('pointerdown', hold, options)
@@ -90,7 +102,9 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
     }
   }, [adding])
 
-  const busy = mode ? 'Finish or cancel the open pop-up first' : null
+  const busy = mode || coinPop ? 'Finish or cancel the open pop-up first' : null
+  const holdings = state.book ? addedCoins(state.book).map(c => ({ coin: c, total: snapshot(state.book.coins[c.ticker]).total })) : []
+  const rename = (id: string, name: string) => update(budget => renameCategory(budget, id, name), 'categories')
   const blocked = state.error
     ? 'The saved budget could not be read, so it cannot be changed'
     : (busy ?? (view === 'history' ? 'Swap the budget back to the center first' : null))
@@ -99,15 +113,21 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
     <main id="stage">
       <h1 className="sr">Boss Budget</h1>
       <Refresh />
-      <PriceChart />
+      <PriceChart coin={coin} />
       <DayRangeWheel />
-      <Holdings total={state.snapshot?.total} />
-      <CategoryActions blocked={blocked} onStart={edit} />
+      <Holdings
+        holdings={holdings}
+        blocked={state.error ? 'The saved budget could not be read, so it cannot be changed' : busy}
+        onAdd={() => setCoinPop({ kind: 'addCoin', pick: null })}
+        onDelete={ticker => setCoinPop({ kind: 'deleteCoin', ticker, typed: '' })}
+      />
+      <CategoryActions coin={coin} blocked={blocked} onStart={edit} />
       {view === 'history' && state.snapshot ? (
         <HistoryTable
           snapshot={state.snapshot}
-          editable={!mode}
-          onEdit={(t: Transaction) => edit(startEdit(t, formatXmr(t.amount)))}
+          coin={coin}
+          editable={!mode && coin !== null}
+          onEdit={(t: Transaction) => coin && edit(startEdit(t, formatAmount(t.amount, coin.decimals)))}
         />
       ) : (
         <CategoriesTable
@@ -116,16 +136,19 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
           onChoose={(category: Category) => mode && edit(choose(mode, category))}
           onName={name => edit({ kind: 'add', name })}
           onSaveName={save}
+          renamable={!blocked}
+          onRename={rename}
         />
       )}
-      <BudgetActions blocked={blocked} onStart={edit} />
+      <BudgetActions coin={coin} blocked={blocked ?? (coin ? null : 'Add a currency first')} onStart={edit} />
       <Filters />
-      <CoinWheel />
+      <CoinWheel coins={holdings.map(h => h.coin)} on={coin?.ticker ?? null} blocked={busy} onView={store.view} />
       <BossButton />
-      <Corner snapshot={state.snapshot} view={view} blocked={state.error ?? busy} onSwap={() => setView(view === 'budget' ? 'history' : 'budget')} />
+      <Corner snapshot={state.snapshot} coin={coin} view={view} blocked={state.error ?? busy} onSwap={() => setView(view === 'budget' ? 'history' : 'budget')} />
       {mode && state.snapshot && (
         <CategoryPopup
           snapshot={state.snapshot}
+          coin={coin}
           mode={mode}
           ready={change !== null}
           error={error}
@@ -133,6 +156,20 @@ export default function Dashboard({ store }: { store: BudgetStore }) {
           onSave={save}
           onCancel={cancel}
           onConfirm={confirm}
+        />
+      )}
+      {coinPop && (
+        <CoinPopup
+          pop={coinPop}
+          added={holdings.map(h => h.coin)}
+          error={error}
+          onChange={next => {
+            setCoinPop(next)
+            setError(null)
+          }}
+          onAdd={ticker => coinDone(store.add(ticker))}
+          onDelete={ticker => coinDone(store.remove(ticker))}
+          onCancel={cancel}
         />
       )}
     </main>

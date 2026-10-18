@@ -9,23 +9,28 @@ const line = sample.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toF
 const ticks = [0.2, 0.4, 0.6, 0.8]
 const days = [{ i: 0, label: '-30d' }, { i: 20, label: '-20d' }, { i: 40, label: '-10d' }, { i: 60, label: 'now' }]
 
-export default function PriceChart() {
+import type { Coin } from '../ledger/coins'
+
+/** With no coin added yet, the chart is blank. */
+export default function PriceChart({ coin }: { coin: Coin | null }) {
   return (
     <section id="chartC" className="comp box" aria-label="Price chart (placeholder)">
-      <svg id="chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Price chart placeholder">
-        {ticks.map(t => (
-          <line key={t} x1={PAD_L} x2={W - PAD_R} y1={y(t)} y2={y(t)} stroke="#ddd" strokeDasharray="3 5" />
-        ))}
-        <path d={`M${PAD_L} ${PAD_T - 4} L${PAD_L - 1} ${H - PAD_B} L${W - PAD_R} ${H - PAD_B + 1}`} fill="none" stroke="#333" strokeWidth="1.4" />
-        {days.map(d => (
-          <text key={d.label} x={x(d.i)} y={H - 6} textAnchor="middle" fontSize="11" fill="#888">{d.label}</text>
-        ))}
-        <path d={line} fill="none" stroke="#bbb" strokeWidth="1.6" strokeDasharray="5 4" />
-        <text x="10" y="34" fontSize="28" fill="#333">XMR</text>
-        <text x="10" y="54" fontSize="11" fill="#888">$-,--</text>
-        <text x="10" y="72" fontSize="11" fill="#888">sample line</text>
-        <text x="10" y="128" fontSize="24" fill="#333">USD</text>
-      </svg>
+      {coin && (
+        <svg id="chart" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Price chart placeholder">
+          {ticks.map(t => (
+            <line key={t} x1={PAD_L} x2={W - PAD_R} y1={y(t)} y2={y(t)} stroke="#ddd" strokeDasharray="3 5" />
+          ))}
+          <path d={`M${PAD_L} ${PAD_T - 4} L${PAD_L - 1} ${H - PAD_B} L${W - PAD_R} ${H - PAD_B + 1}`} fill="none" stroke="#333" strokeWidth="1.4" />
+          {days.map(d => (
+            <text key={d.label} x={x(d.i)} y={H - 6} textAnchor="middle" fontSize="11" fill="#888">{d.label}</text>
+          ))}
+          <path d={line} fill="none" stroke="#bbb" strokeWidth="1.6" strokeDasharray="5 4" />
+          <text x="10" y="34" fontSize="28" fill="#333">{coin.ticker}</text>
+          <text x="10" y="54" fontSize="11" fill="#888">$-,--</text>
+          <text x="10" y="72" fontSize="11" fill="#888">sample line</text>
+          <text x="10" y="128" fontSize="24" fill="#333">USD</text>
+        </svg>
+      )}
     </section>
   )
 }

@@ -1,5 +1,6 @@
 import { isIsoDate, todayIso } from './dates'
-import { formatXmr } from './piconero'
+import { formatAmount } from './amount'
+import { findCoin } from './coins'
 
 // The budget is an append-only list of entries. Balances are never stored or
 // edited directly; they are recalculated by replaying the entries in order.
@@ -9,6 +10,8 @@ import { formatXmr } from './piconero'
 // Editing or deleting a past deposit or spend is itself an entry. When it is replayed, the
 // transaction's old effect is undone and its new effect applied, so nothing else is erased.
 // Only edits and deletes may leave a balance below zero (as in YNAB); new spends and moves never can.
+//
+// Each coin has a budget of its own. The categories are shared: see book.ts.
 
 export const READY_TO_ASSIGN = 'ready'
 export const STARTER_CATEGORIES = ['Groceries', 'Gas', 'Emergency'] as const
@@ -26,6 +29,7 @@ export interface Details {
 export type Entry =
   | { kind: 'addCategory'; id: string; name: string }
   | { kind: 'deleteCategory'; id: string }
+  | { kind: 'renameCategory'; id: string; name: string }
   | ({ kind: 'deposit'; id: string; amount: bigint } & Details)
   | ({ kind: 'spend'; id: string; from: string; amount: bigint } & Details)
   | { kind: 'move'; from: string; to: string; amount: bigint }
@@ -51,6 +55,8 @@ export interface Category {
 }
 
 export interface Budget {
+  /** The ticker of the coin this budget is kept in. Left out for the shared categories, which hold no money. */
+  readonly coin?: string
   readonly entries: readonly Entry[]
 }
 
@@ -88,11 +94,12 @@ export function snapshot(budget: Budget): Snapshot {
     if (!category) throw new BudgetError(`Unknown category: ${id}`)
     return category
   }
+  const coin = budget.coin === undefined ? undefined : findCoin(budget.coin)
+  if (budget.coin !== undefined && !coin) throw new BudgetError(`Unknown coin: ${budget.coin}`)
+  const show = (amount: bigint) => (coin ? `${formatAmount(amount, coin.decimals)} ${coin.ticker}` : `${amount}`)
   const take = (category: Category, amount: bigint) => {
     if (category.balance < amount) {
-      throw new BudgetError(
-        `${category.name} holds ${formatXmr(category.balance)} XMR, which is less than ${formatXmr(amount)} XMR`,
-      )
+      throw new BudgetError(`${category.name} holds ${show(category.balance)}, which is less than ${show(amount)}`)
     }
     category.balance -= amount
   }
@@ -121,6 +128,19 @@ export function snapshot(budget: Budget): Snapshot {
     }
     if (typeof details.date !== 'string' || !isIsoDate(details.date)) throw new BudgetError(`Invalid date: ${details.date}`)
   }
+  // A name must be filled in, short enough, and not another category's name, ignoring capitals.
+  const checkName = (name: string, except?: string) => {
+    if (!name) throw new BudgetError('Category name cannot be empty')
+    if ([...name].length > MAX_NAME_LENGTH) {
+      throw new BudgetError(`Category names are limited to ${MAX_NAME_LENGTH} characters`)
+    }
+    const lower = name.toLowerCase()
+    for (const category of categories.values()) {
+      if (category.id !== except && category.name.toLowerCase() === lower) {
+        throw new BudgetError(`A category named "${category.name}" already exists`)
+      }
+    }
+  }
   const spendable = (id: string) => {
     if (id === READY_TO_ASSIGN) throw new BudgetError('Spending must come from a category, not Ready to Assign')
     return existing(id)
@@ -137,18 +157,17 @@ export function snapshot(budget: Budget): Snapshot {
     switch (entry.kind) {
       case 'addCategory': {
         const name = entry.name.trim()
-        if (!name) throw new BudgetError('Category name cannot be empty')
-        if ([...name].length > MAX_NAME_LENGTH) {
-          throw new BudgetError(`Category names are limited to ${MAX_NAME_LENGTH} characters`)
-        }
+        checkName(name)
         if (categories.has(entry.id)) throw new BudgetError(`Duplicate category id: ${entry.id}`)
-        const lower = name.toLowerCase()
-        for (const category of categories.values()) {
-          if (category.name.toLowerCase() === lower) {
-            throw new BudgetError(`A category named "${category.name}" already exists`)
-          }
-        }
         categories.set(entry.id, { id: entry.id, name, balance: 0n })
+        break
+      }
+      case 'renameCategory': {
+        if (entry.id === READY_TO_ASSIGN) throw new BudgetError('Ready to Assign cannot be renamed')
+        const category = existing(entry.id)
+        const name = entry.name.trim()
+        checkName(name, entry.id)
+        category.name = name
         break
       }
       case 'deleteCategory': {
@@ -212,25 +231,27 @@ export function checkGuardrail({ categories, total }: Pick<Snapshot, 'categories
   let sum = 0n
   for (const category of categories) sum += category.balance
   if (sum !== total) {
-    throw new BudgetError(`Guardrail broken: categories add up to ${sum} piconero, but the total is ${total}`)
+    throw new BudgetError(`Guardrail broken: categories add up to ${sum} smallest units, but the total is ${total}`)
   }
 }
 
 /** Appends an entry only if the budget still replays cleanly with it. The original budget is never modified. */
 function apply(budget: Budget, entry: Entry): Budget {
-  const next = { entries: [...budget.entries, entry] }
+  const next = { ...budget, entries: [...budget.entries, entry] }
   snapshot(next)
   return next
 }
 
 let idCounter = 0
-function newId(): string {
+export function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Date.now()}-${++idCounter}`
 }
 
 export const addCategory = (budget: Budget, name: string, id: string = newId()) =>
   apply(budget, { kind: 'addCategory', id, name: name.trim() })
 export const deleteCategory = (budget: Budget, id: string) => apply(budget, { kind: 'deleteCategory', id })
+export const renameCategory = (budget: Budget, id: string, name: string) =>
+  apply(budget, { kind: 'renameCategory', id, name: name.trim() })
 const noDetails = (): Details => ({ note: '', date: todayIso() })
 
 export const deposit = (budget: Budget, amount: bigint, details: Details = noDetails(), id: string = newId()) =>

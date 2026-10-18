@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest'
+import { COINS } from './coins'
 import {
   BudgetError,
   READY_TO_ASSIGN,
@@ -9,6 +10,7 @@ import {
   deposit,
   editTransaction,
   move,
+  renameCategory,
   snapshot,
   spend,
   starterBudget,
@@ -18,6 +20,7 @@ import { deserialize, serialize } from './storage'
 // Runs a long sequence of random operations, including many that should be refused,
 // along with edits and deletes of past deposits and spends, which may leave balances negative,
 // and checks the ledger against a separate, deliberately simple model after every step.
+// It runs once for every coin, at that coin's own number of decimal places.
 // STRESS_OPS sets the count: 500 by default, 3,000 in the GitHub check.
 // STRESS_SEED makes a run repeatable; the seed is printed so any failure can be replayed.
 
@@ -36,11 +39,15 @@ function random(seed: number) {
   }
 }
 
-it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => {
+it.each(COINS.map((c) => [c.ticker, c.decimals] as const))(`keeps %s's guardrail through ${OPS} random operations (seed ${SEED})`, (ticker, decimals) => {
   const rand = random(SEED)
   const pick = <T,>(items: T[]) => items[Math.floor(rand() * items.length)]
-  // Amounts range from 1 piconero to about 1,000 XMR.
-  const amount = () => BigInt(Math.floor(rand() ** 3 * 1_000_000_000_000_000) + 1)
+  // Amounts range from the coin's smallest unit to about 1,000 coins: a random number of digits, then random digits,
+  // so every decimal place gets used, even at Ethereum's 18.
+  const amount = () => {
+    const length = 1 + Math.floor(rand() * (decimals + 3))
+    return BigInt(Array.from({ length }, () => Math.floor(rand() * 10)).join('')) + 1n
+  }
   // Usually part or all of what the category holds; sometimes a random amount that may be too much.
   const amountFrom = (balance: bigint) => {
     const r = rand()
@@ -49,7 +56,7 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
     return (balance * BigInt(Math.floor(rand() * 1_000_000))) / 1_000_000n + 1n
   }
 
-  let budget: Budget = starterBudget()
+  let budget: Budget = { coin: ticker, ...starterBudget() }
   const model = new Map<string, bigint>([[READY_TO_ASSIGN, 0n], ['starter-1', 0n], ['starter-2', 0n], ['starter-3', 0n]])
   let total = 0n
   let nextId = 1
@@ -108,7 +115,13 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
       expectOk = from !== READY_TO_ASSIGN && model.get(from)! >= a
       run = () => spend(budget, from, a, details, id)
       update = () => { affect({ from, amount: a }, 1n); records.set(id, { from, amount: a }) }
-    } else if (roll < 0.93 || others.length === 0) {
+    } else if (roll < 0.88 && others.length > 0) {
+      // Renaming moves no money; the model only checks that it is accepted.
+      const n = nextId++
+      const id = pick(others)
+      expectOk = true
+      run = () => renameCategory(budget, id, `Renamed ${n}`)
+    } else if (roll < 0.94 || others.length === 0) {
       const n = nextId++
       const id = `stress-${n}`
       expectOk = true
@@ -147,11 +160,14 @@ it(`keeps the guardrail through ${OPS} random operations (seed ${SEED})`, () => 
       Object.fromEntries([...records].map(([id, t]) => [id, t.amount])),
     )
 
-    if (step % 100 === 0) expect(deserialize(serialize(budget)), `step ${step} save/load`).toEqual(budget)
+    if (step % 100 === 0) {
+      const categories = { entries: budget.entries.filter((e) => e.kind.endsWith('Category')) }
+      expect(deserialize(serialize({ categories, coins: { [ticker]: budget } })).coins[ticker], `step ${step} save/load`).toEqual(budget)
+    }
   }
 
   console.log(
-    `Stress test: ${OPS} operations, ${counts.accepted} accepted, ${counts.refused} refused, ` +
+    `Stress test, ${ticker}: ${OPS} operations, ${counts.accepted} accepted, ${counts.refused} refused, ` +
       `${counts.negative} steps with a negative balance, seed ${SEED}`,
   )
   expect(counts.accepted + counts.refused).toBe(OPS)

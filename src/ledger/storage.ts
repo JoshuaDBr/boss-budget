@@ -1,17 +1,19 @@
-import { todayIso } from './dates'
-import { type Budget, type Entry, snapshot, starterBudget } from './ledger'
+import { checkBook, starterBook, type Book } from './book'
+import { findCoin } from './coins'
+import type { Budget, Entry } from './ledger'
 
 // Saved in the browser (localStorage). No login, no server.
 // bigint amounts are written as decimal strings, since JSON has no bigint type.
 
-export const STORAGE_KEY = 'boss-budget:v2'
-const FORMAT_VERSION = 3
-// Version 2 (Phase 1) saved deposits and spends without an id, note or date. They are upgraded on load:
-// each gets an id, an empty note and the day of the upgrade, and the budget is saved again as version 3.
-const PHASE_1_VERSION = 2
+export const STORAGE_KEY = 'boss-budget:v3'
+const FORMAT_VERSION = 4
+/** The coin on screen, so the app opens on the coin last viewed. */
+export const VIEW_KEY = 'boss-budget:v3-coin'
 
-// Where V1 saved its XRP budget. V2 deletes it the first time it opens and starts fresh (V2 PRD, Phase 1).
+// Where V1 saved its XRP budget and V2 its XMR budget. V3 deletes both the first time it opens and starts with no coins
+// (V3 PRD, Phase 1).
 export const V1_STORAGE_KEY = 'boss-budget:v1'
+export const V2_STORAGE_KEY = 'boss-budget:v2'
 
 /** The part of localStorage we use; tests pass in an in-memory stand-in. */
 export interface KeyValueStore {
@@ -24,64 +26,70 @@ export class StorageError extends Error {}
 
 type StoredEntry = Omit<Entry, 'amount'> & { amount?: string }
 
-export function serialize(budget: Budget): string {
-  const entries = budget.entries.map((entry) =>
-    'amount' in entry ? { ...entry, amount: entry.amount.toString() } : entry,
-  )
-  return JSON.stringify({ version: FORMAT_VERSION, entries })
+const writeEntries = (budget: Budget) =>
+  budget.entries.map((entry) => ('amount' in entry ? { ...entry, amount: entry.amount.toString() } : entry))
+
+export function serialize(book: Book): string {
+  const coins = Object.fromEntries(Object.entries(book.coins).map(([ticker, budget]) => [ticker, writeEntries(budget)]))
+  return JSON.stringify({ version: FORMAT_VERSION, categories: writeEntries(book.categories), coins })
 }
 
-/** Parses saved data and replays it; throws StorageError if anything is malformed or breaks a rule. */
-export function deserialize(text: string): Budget {
-  return read(text).budget
-}
-
-function read(text: string): { budget: Budget; upgraded: boolean } {
-  let data: { version?: unknown; entries?: unknown }
-  try {
-    data = JSON.parse(text)
-  } catch {
-    throw new StorageError('Saved budget is not valid JSON')
-  }
-  const upgraded = data.version === PHASE_1_VERSION
-  if ((data.version !== FORMAT_VERSION && !upgraded) || !Array.isArray(data.entries)) {
-    throw new StorageError('Saved budget has an unknown format')
-  }
-  const today = todayIso()
-  const entries = (data.entries as StoredEntry[]).map((stored, index) => {
-    const entry =
-      upgraded && (stored.kind === 'deposit' || stored.kind === 'spend')
-        ? { ...stored, id: `legacy-${index}`, note: '', date: today }
-        : stored
+function readEntries(stored: unknown): Entry[] {
+  if (!Array.isArray(stored)) throw new StorageError('Saved budget has an unknown format')
+  return (stored as StoredEntry[]).map((entry) => {
     if (entry.amount === undefined) return entry as Entry
     if (typeof entry.amount !== 'string' || !/^\d+$/.test(entry.amount)) {
       throw new StorageError('Saved budget contains an invalid amount')
     }
     return { ...entry, amount: BigInt(entry.amount) } as Entry
   })
-  const budget = { entries }
+}
+
+/** Parses saved data and replays every coin; throws StorageError if anything is malformed or breaks a rule. */
+export function deserialize(text: string): Book {
+  let data: { version?: unknown; categories?: unknown; coins?: unknown }
   try {
-    snapshot(budget)
+    data = JSON.parse(text)
+  } catch {
+    throw new StorageError('Saved budget is not valid JSON')
+  }
+  if (data.version !== FORMAT_VERSION || typeof data.coins !== 'object' || data.coins === null || Array.isArray(data.coins)) {
+    throw new StorageError('Saved budget has an unknown format')
+  }
+  const coins: Record<string, Budget> = {}
+  for (const [ticker, entries] of Object.entries(data.coins)) coins[ticker] = { coin: ticker, entries: readEntries(entries) }
+  const book = { categories: { entries: readEntries(data.categories) }, coins }
+  try {
+    checkBook(book)
   } catch (error) {
     throw new StorageError(`Saved budget failed its checks: ${(error as Error).message}`)
   }
-  return { budget, upgraded }
+  return book
 }
 
 /**
- * Loads the saved budget, or the starter budget if nothing is saved yet.
- * Any XRP budget left by V1 is deleted first, so V2 starts fresh with the starter categories.
+ * Loads the saved book, or the starter categories with no coins if nothing is saved yet.
+ * Any budget left by V1 or V2 is deleted first, so V3 starts fresh.
  * Damaged data throws rather than being silently replaced, so it is never overwritten by accident.
  */
-export function load(store: KeyValueStore): Budget {
+export function load(store: KeyValueStore): Book {
   store.removeItem(V1_STORAGE_KEY)
+  store.removeItem(V2_STORAGE_KEY)
   const text = store.getItem(STORAGE_KEY)
-  if (text === null) return starterBudget()
-  const { budget, upgraded } = read(text)
-  if (upgraded) save(store, budget)
-  return budget
+  return text === null ? starterBook() : deserialize(text)
 }
 
-export function save(store: KeyValueStore, budget: Budget): void {
-  store.setItem(STORAGE_KEY, serialize(budget))
+export function save(store: KeyValueStore, book: Book): void {
+  store.setItem(STORAGE_KEY, serialize(book))
+}
+
+/** The coin last viewed, if it is still in the book. */
+export function loadView(store: KeyValueStore, book: Book): string | null {
+  const ticker = store.getItem(VIEW_KEY)
+  return ticker !== null && findCoin(ticker) && book.coins[ticker] ? ticker : null
+}
+
+export function saveView(store: KeyValueStore, ticker: string | null): void {
+  if (ticker === null) store.removeItem(VIEW_KEY)
+  else store.setItem(VIEW_KEY, ticker)
 }

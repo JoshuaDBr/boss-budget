@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { todayIso } from './dates'
-import { READY_TO_ASSIGN, deposit, move, snapshot, starterBudget } from './ledger'
-import { STORAGE_KEY, StorageError, V1_STORAGE_KEY, type KeyValueStore, deserialize, load, save, serialize } from './storage'
+import { addCoin, changeCoin, starterBook } from './book'
+import { READY_TO_ASSIGN, deposit, move } from './ledger'
+import {
+  STORAGE_KEY,
+  StorageError,
+  V1_STORAGE_KEY,
+  V2_STORAGE_KEY,
+  VIEW_KEY,
+  type KeyValueStore,
+  deserialize,
+  load,
+  loadView,
+  save,
+  saveView,
+  serialize,
+} from './storage'
 
 const memoryStore = (initial: Record<string, string> = {}): KeyValueStore & { data: Record<string, string> } => {
   const data = { ...initial }
@@ -13,33 +26,41 @@ const memoryStore = (initial: Record<string, string> = {}): KeyValueStore & { da
   }
 }
 
+const withXmr = () => changeCoin(addCoin(starterBook(), 'XMR'), 'XMR', (b) => deposit(b, 5n))
+
 describe('storage', () => {
-  it('starts with the starter budget when nothing is saved', () => {
-    expect(snapshot(load(memoryStore())).categories).toHaveLength(4)
+  it('starts with the starter categories and no coins when nothing is saved', () => {
+    expect(load(memoryStore())).toEqual(starterBook())
   })
 
-  it('deletes the XRP budget saved by V1 and starts fresh', () => {
-    const v1 = serialize(deposit(starterBudget(), 5n)).replace('"version":2', '"version":1')
-    const store = memoryStore({ [V1_STORAGE_KEY]: v1 })
-    expect(load(store)).toEqual(starterBudget())
+  it('deletes the budgets saved by V1 and V2 and starts fresh', () => {
+    const store = memoryStore({ [V1_STORAGE_KEY]: '{"version":1,"entries":[]}', [V2_STORAGE_KEY]: '{"version":3,"entries":[]}' })
+    expect(load(store)).toEqual(starterBook())
     expect(store.data).not.toHaveProperty(V1_STORAGE_KEY)
+    expect(store.data).not.toHaveProperty(V2_STORAGE_KEY)
   })
 
-  it('round-trips a budget exactly, including very large amounts', () => {
+  it('round-trips every coin exactly, including very large amounts', () => {
     const store = memoryStore()
-    const budget = move(deposit(starterBudget(), 99_999_999_999_999_999n), READY_TO_ASSIGN, 'starter-1', 1n)
-    save(store, budget)
-    expect(load(store)).toEqual(budget)
-    expect(store.data[STORAGE_KEY]).toContain('"99999999999999999"')
+    let book = addCoin(withXmr(), 'ETH')
+    book = changeCoin(book, 'ETH', (b) => move(deposit(b, 99_999_999_999_999_999_999_999n), READY_TO_ASSIGN, 'starter-1', 1n))
+    save(store, book)
+    expect(load(store)).toEqual(book)
+    expect(store.data[STORAGE_KEY]).toContain('"99999999999999999999999"')
   })
 
   it('refuses damaged or tampered data instead of loading it', () => {
-    const tampered = JSON.parse(serialize(deposit(starterBudget(), 5n)))
-    tampered.entries.push({ kind: 'spend', from: READY_TO_ASSIGN, amount: '5' })
-    for (const text of ['not json', '{"version":1,"entries":[]}', JSON.stringify(tampered)]) {
-      expect(() => deserialize(text)).toThrow(StorageError)
+    const tampered = JSON.parse(serialize(withXmr()))
+    tampered.coins.XMR.push({ kind: 'spend', from: READY_TO_ASSIGN, amount: '5' })
+    const unknownCoin = JSON.parse(serialize(withXmr()))
+    unknownCoin.coins = { DOGE: unknownCoin.coins.XMR }
+    const moneyInCategories = JSON.parse(serialize(withXmr()))
+    moneyInCategories.categories.push({ kind: 'deposit', id: 'd', amount: '1', note: '', date: '2026-10-01' })
+    const texts = ['not json', '{"version":3,"entries":[]}', '{"version":4,"categories":[],"coins":[]}']
+    for (const text of [...texts, ...[tampered, unknownCoin, moneyInCategories].map((d) => JSON.stringify(d))]) {
+      expect(() => deserialize(text), text).toThrow(StorageError)
     }
-    const badAmount = serialize(deposit(starterBudget(), 5n)).replace('"5"', '"-5"')
+    const badAmount = serialize(withXmr()).replace('"5"', '"-5"')
     expect(() => deserialize(badAmount)).toThrow(StorageError)
   })
 
@@ -50,26 +71,17 @@ describe('storage', () => {
   })
 })
 
-describe('upgrading a Phase 1 budget', () => {
-  it('gives old deposits and spends an id, an empty note and today, then saves it again', () => {
-    const phase1 = JSON.stringify({
-      version: 2,
-      entries: [
-        { kind: 'addCategory', id: READY_TO_ASSIGN, name: 'Ready to Assign' },
-        { kind: 'addCategory', id: 'food', name: 'Food' },
-        { kind: 'deposit', amount: '10' },
-        { kind: 'move', from: READY_TO_ASSIGN, to: 'food', amount: '6' },
-        { kind: 'spend', from: 'food', amount: '4' },
-      ],
-    })
-    const store = memoryStore({ [STORAGE_KEY]: phase1 })
-    const budget = load(store)
-    const today = todayIso()
-    expect(snapshot(budget).transactions).toEqual([
-      { id: 'legacy-2', kind: 'deposit', amount: 10n, note: '', date: today, order: 0 },
-      { id: 'legacy-4', kind: 'spend', from: 'food', amount: 4n, note: '', date: today, order: 1 },
-    ])
-    expect(JSON.parse(store.data[STORAGE_KEY]).version).toBe(3)
-    expect(load(store)).toEqual(budget)
+describe('the coin last viewed', () => {
+  it('is remembered, but only while that coin is still in the book', () => {
+    const store = memoryStore()
+    const book = withXmr()
+    expect(loadView(store, book)).toBeNull()
+    saveView(store, 'XMR')
+    expect(loadView(store, book)).toBe('XMR')
+    expect(loadView(store, starterBook())).toBeNull()
+    saveView(store, null)
+    expect(store.data).not.toHaveProperty(VIEW_KEY)
+    store.data[VIEW_KEY] = 'DOGE'
+    expect(loadView(store, book)).toBeNull()
   })
 })

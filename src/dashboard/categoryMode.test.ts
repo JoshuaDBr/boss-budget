@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { findCoin } from '../ledger/coins'
 import { isoToDigits, todayIso } from '../ledger/dates'
 import { READY_TO_ASSIGN, deleteCategory, deposit, move, snapshot, spend, starterBudget, type Category } from '../ledger/ledger'
 import {
@@ -17,6 +18,8 @@ import {
   startSpend,
   type Mode,
 } from './categoryMode'
+
+const XMR = findCoin('XMR')!
 
 const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000_000_000n }
 const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_000_000_000_000n }
@@ -95,23 +98,23 @@ describe('Save', () => {
   const funded = move(deposit(starterBudget(), 10_000_000_000_000n), READY_TO_ASSIGN, 'starter-1', 4_000_000_000_000n)
   const categories = snapshot(funded).categories
   const after = (mode: Mode) => {
-    const change = pendingChange(mode, categories)
+    const change = pendingChange(mode, categories, XMR)
     return change && snapshot(change(funded)).categories.map(c => `${c.name} ${c.balance}`)
   }
 
   it('is not ready until the pop-up is complete and valid', () => {
-    expect(pendingChange(startAdd(), categories)).toBeNull()
-    expect(pendingChange({ kind: 'add', name: 'gas' }, categories)).toBeNull()
-    expect(pendingChange({ ...startMove(), from: 'starter-1', amount: '1' }, categories)).toBeNull()
-    expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '4.000000000001' }, categories)).toBeNull()
-    expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '0' }, categories)).toBeNull()
-    expect(pendingChange(startDelete(), categories)).toBeNull()
-    expect(pendingChange({ kind: 'delete', id: READY_TO_ASSIGN }, categories)).toBeNull()
-    expect(pendingChange(startDeposit(), categories)).toBeNull()
-    expect(pendingChange({ ...startDeposit(), amount: '1.0000000000001' }, categories)).toBeNull()
-    expect(pendingChange({ ...startSpend(), amount: '1' }, categories)).toBeNull()
-    expect(pendingChange({ ...startSpend(), from: 'starter-1', amount: '4.000000000001', active: 'amount' }, categories)).toBeNull()
-    expect(pendingChange({ ...startSpend(), from: READY_TO_ASSIGN, amount: '1', active: 'amount' }, categories)).toBeNull()
+    expect(pendingChange(startAdd(), categories, XMR)).toBeNull()
+    expect(pendingChange({ kind: 'add', name: 'gas' }, categories, XMR)).toBeNull()
+    expect(pendingChange({ ...startMove(), from: 'starter-1', amount: '1' }, categories, XMR)).toBeNull()
+    expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '4.000000000001' }, categories, XMR)).toBeNull()
+    expect(pendingChange({ ...startMove(), from: 'starter-1', to: 'starter-2', amount: '0' }, categories, XMR)).toBeNull()
+    expect(pendingChange(startDelete(), categories, XMR)).toBeNull()
+    expect(pendingChange({ kind: 'delete', id: READY_TO_ASSIGN }, categories, XMR)).toBeNull()
+    expect(pendingChange(startDeposit(), categories, XMR)).toBeNull()
+    expect(pendingChange({ ...startDeposit(), amount: '1.0000000000001' }, categories, XMR)).toBeNull()
+    expect(pendingChange({ ...startSpend(), amount: '1' }, categories, XMR)).toBeNull()
+    expect(pendingChange({ ...startSpend(), from: 'starter-1', amount: '4.000000000001', active: 'amount' }, categories, XMR)).toBeNull()
+    expect(pendingChange({ ...startSpend(), from: READY_TO_ASSIGN, amount: '1', active: 'amount' }, categories, XMR)).toBeNull()
   })
 
   it('adds, moves and deletes through the ledger', () => {
@@ -152,8 +155,8 @@ describe('Note and Date', () => {
   it('are recorded with the transaction, and keep Save dull while the date is unfinished', () => {
     const budget = starterBudget()
     const categories = snapshot(budget).categories
-    expect(pendingChange({ ...startDeposit(), amount: '1', date: '1014' }, categories)).toBeNull()
-    const change = pendingChange({ ...startDeposit(), amount: '1', note: ' Paycheck ', date: '10012026' }, categories)
+    expect(pendingChange({ ...startDeposit(), amount: '1', date: '1014' }, categories, XMR)).toBeNull()
+    const change = pendingChange({ ...startDeposit(), amount: '1', note: ' Paycheck ', date: '10012026' }, categories, XMR)
     expect(snapshot(change!(budget)).transactions[0]).toMatchObject({ note: 'Paycheck', date: '2026-10-01' })
   })
 })
@@ -174,7 +177,7 @@ describe('edit pop-up', () => {
   )
   const { categories, transactions } = snapshot(funded)
   const balancesAfter = (mode: Mode, budget = funded) => {
-    const change = pendingChange(mode, snapshot(budget).categories)
+    const change = pendingChange(mode, snapshot(budget).categories, XMR)
     return change && snapshot(change(budget)).categories.map(c => c.balance)
   }
 
@@ -187,13 +190,13 @@ describe('edit pop-up', () => {
   it('may move a spend to a category holding 0 XMR and leave it negative, but never to Ready to Assign', () => {
     const edit = startEdit(transactions[1], '0.000000000005')
     expect(balancesAfter({ ...edit, from: 'starter-2' })).toEqual([6n, 4n, -5n, 0n])
-    expect(pendingChange({ ...edit, from: READY_TO_ASSIGN }, categories)).toBeNull()
+    expect(pendingChange({ ...edit, from: READY_TO_ASSIGN }, categories, XMR)).toBeNull()
   })
 
   it('keeps Save dull for an unassigned spend until a category is chosen', () => {
     const orphaned = deleteCategory(funded, 'starter-1')
     const edit = startEdit(snapshot(orphaned).transactions[1], '0.000000000003')
-    expect(pendingChange(edit, snapshot(orphaned).categories)).toBeNull()
+    expect(pendingChange(edit, snapshot(orphaned).categories, XMR)).toBeNull()
     expect(balancesAfter({ ...edit, from: 'starter-3' }, orphaned)).toEqual([10n, 0n, -3n])
   })
 

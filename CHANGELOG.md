@@ -2,6 +2,16 @@
 
 Boss Budget follows [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH. While the major number is 0, the app is in alpha: features are still arriving and saved data may be reset. Each PRD generation is a minor version (V1 = 0.1, V2 = 0.2), and bug fixes are patches.
 
+## 0.3.0 (2026-10-17)
+
+V3, "Multi-Coin", per the V3 PRD.
+
+- Twelve coins (ARRR, BCH, BTC, DASH, ETH, FIRO, SOL, XMR, XRP, XTM, ZANO, ZEC), each kept exactly at its own precision (6 to 18 decimal places). Every coin has its own budget, with balances and history apart; the category list is shared. V2 data is cleared on first open.
+- The app opens empty. Coins are added from "+ Add a Currency" in holdings and deleted from each row's 3-dot menu, after typing "delete".
+- The wheel shows the coin on screen in the centre, with its neighbours on the side tabs and the ‹ › arrows.
+- Holding a category name for half a second renames it, in every coin at once.
+- Holdings and the corner box show six decimal places, cut, not rounded. The table, the pop-ups and the full history show every place; long amounts shrink to fit.
+
 ## 0.2.1 (2026-10-15)
 
 Bug fixes.
