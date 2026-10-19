@@ -1,4 +1,4 @@
-// The price feed: one queue, one request at a time, at least 12 seconds apart (the free feed allows about five a
+// The price feed: one queue, one request at a time, at least 13 seconds apart (the free feed allows about five a
 // minute; see the V4 pace test). Prices live in memory only, so an app opened offline shows $-,-- until one arrives.
 //
 // The launch queue keeps each result as it arrives; if a request fails, the rest of the queue is dropped. A refresh
@@ -8,7 +8,7 @@
 import { COINS } from '../ledger/coins'
 import { graphUrl, parseGraph, parsePrices, pricesUrl } from './coingecko'
 
-export const SPACING = 12_000
+export const SPACING = 13_000
 
 export type Job = { kind: 'prices' } | { kind: 'graph'; ticker: string }
 
@@ -197,7 +197,7 @@ export function remaining(state: Pick<FeedState, 'left' | 'nextAt'>, now: number
   return Math.max(now, state.nextAt) + SPACING * (state.left - 1) - now
 }
 
-/** 2:24 until under a minute, then 59. Whole seconds, rounded up. */
+/** 2:36 until under a minute, then 59. Whole seconds, rounded up. */
 export function countdownText(ms: number) {
   const s = Math.ceil(Math.max(0, ms) / 1000)
   return s < 60 ? String(s) : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`

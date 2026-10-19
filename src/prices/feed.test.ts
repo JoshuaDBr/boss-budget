@@ -48,7 +48,7 @@ describe('request order', () => {
 })
 
 describe('the queue', () => {
-  it('sends one request at a time, 12 seconds apart', async () => {
+  it('sends one request at a time, 13 seconds apart', async () => {
     const { sent, get } = fake(ok)
     const feed = new Feed(get)
     feed.launch(launchJobs(['XMR'], 'XMR'))
@@ -59,10 +59,10 @@ describe('the queue', () => {
     expect(feed.getState().running).toBe(false)
   })
 
-  it('launch counts down from 2:24 with 13 requests', () => {
+  it('launch counts down from 2:36 with 13 requests', () => {
     const feed = new Feed(fake(ok).get)
     feed.launch(launchJobs([], null))
-    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('2:24')
+    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('2:36')
   })
 
   it('waits for a slow reply before sending the next request', async () => {
@@ -119,7 +119,7 @@ describe('the queue', () => {
     expect(feed.refresh(coinRefreshJobs('XMR'))).toBe(true)
   })
 
-  it('a refresh right after the launch still keeps 12 seconds from the last request', async () => {
+  it('a refresh right after the launch still keeps 13 seconds from the last request', async () => {
     const { sent, get } = fake(ok)
     const feed = new Feed(get)
     feed.launch([{ kind: 'prices' }])
@@ -217,10 +217,10 @@ describe('countdown and label', () => {
     expect(remaining({ left: 0, nextAt: 0 }, 0)).toBe(0)
   })
 
-  it('a coin refresh counts down from 12', () => {
+  it('a coin refresh counts down from 13', () => {
     const feed = new Feed(fake(ok).get)
     feed.refresh(coinRefreshJobs('XMR'))
-    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('12')
+    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('13')
   })
 
   it('labels the time of the newest price', () => {
