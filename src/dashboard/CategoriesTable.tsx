@@ -261,7 +261,7 @@ function RenameBox({ category, categories, onSave, onDone }: RenameProps) {
 
 /** A coin amount in the table, shrunk to fit when it is long. */
 function CoinCell({ text, negative }: { text: string; negative: boolean }) {
-  const size = fitFont(text, 20, 19)
+  const size = fitFont(text, 17, 19)
   return (
     <td className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
       {text}

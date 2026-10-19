@@ -109,7 +109,7 @@ export function HistoryTable({ snapshot, coin, editable, onEdit }: HistoryProps)
             {newestFirst(snapshot.transactions).map(t => {
               const category = categoryOf(t, snapshot.categories)
               const amount = `${sign(t)}${formatAmount(t.amount, coin?.decimals ?? 0)}`
-              const size = fitFont(amount, 19, 16)
+              const size = fitFont(amount, 17, 16)
               return (
                 <tr key={t.id} className={editable ? 'choosable' : undefined} onClick={editable ? () => onEdit(t) : undefined}>
                   <td className="date">{isoToUs(t.date)}</td>
@@ -185,7 +185,7 @@ export function BossHistoryTable({ boss }: { boss: BossData }) {
 
 /** An amount in the corner box, shrunk to fit its narrow column when it is long. */
 function MiniAmount({ text, negative }: { text: string; negative: boolean }) {
-  const size = fitFont(text, 9, 14)
+  const size = fitFont(text, 8, 14)
   return (
     <td className={negative ? 'num neg' : 'num'} style={size ? { fontSize: size } : undefined}>
       {text}

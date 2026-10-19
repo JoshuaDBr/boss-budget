@@ -11,6 +11,7 @@ V4, "Live Prices and the Boss View", per the V4 PRD.
 - Refresh works. It becomes a countdown (2:24, then 59) until its requests finish, and cannot be clicked until then. "prices: 1:42 PM" shows when the prices last arrived. A refresh that fails shows "Price could not refresh. Try again shortly." and keeps the last prices.
 - Each coin's real 90-day price graph, with dollar gridlines, and the 30 / 60 / 90 disc. "Failed to load." if a graph never arrived.
 - The Boss View, from BOSS once two coins hold money outside Ready to Assign: every coin's budget in dollars, both histories for every coin, a graph of each coin's percent change, and a grand total in holdings.
+- A new font, Lexend, replaces the handwriting font everywhere. It ships with the app; nothing is fetched from a font service.
 
 ## 0.3.0 (2026-10-17)
 

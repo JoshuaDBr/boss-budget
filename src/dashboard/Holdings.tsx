@@ -117,7 +117,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete, boss }: P
 
 /** A coin's total, shrunk to fit beside the 3-dot button when it is long. */
 function Total({ text, negative }: { text: string; negative: boolean }) {
-  const size = fitFont(text, 12, 18)
+  const size = fitFont(text, 11, 18)
   return (
     <span className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
       {text}

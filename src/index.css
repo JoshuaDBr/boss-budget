@@ -5,7 +5,7 @@
   --paper: #fdfcf8;
   --accent: #4f7fa8;
   --accent-soft: #e3edf5;
-  --hand: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
+  --font: 'Lexend', sans-serif;
   --rough: 255px 12px 225px 12px / 12px 225px 12px 255px;
 }
 
@@ -18,7 +18,7 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--hand);
+  font-family: var(--font);
   font-size: 15px;
 }
 
