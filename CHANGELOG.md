@@ -2,6 +2,17 @@
 
 Boss Budget follows [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH. While the major number is 0, the app is in alpha: features are still arriving and saved data may be reset. Each PRD generation is a minor version (V1 = 0.1, V2 = 0.2), and bug fixes are patches.
 
+## 0.4.0 (2026-10-18)
+
+V4, "Live Prices and the Boss View", per the V4 PRD.
+
+- Live dollar values from CoinGecko's free feed, with no account and no key: in holdings, the budget table, both histories, the corner box and every pop-up. Two decimal places with commas; past transactions use today's price.
+- All requests go through one queue, one every 13 seconds, to stay inside the free limit. At launch: every coin's price, then the coin on screen's graph, then the other coins added, then the rest. A coin switched to moves up the queue.
+- Refresh works. It becomes a countdown (2:36, then 59) until its requests finish, and cannot be clicked until then. "prices: 1:42 PM" shows when the prices last arrived. A refresh that fails shows "Price could not refresh. Try again shortly." and keeps the last prices.
+- Each coin's real 90-day price graph, with dollar gridlines, and the 30 / 60 / 90 disc. "Failed to load." if a graph never arrived.
+- The Boss View, from BOSS once two coins hold money outside Ready to Assign: every coin's budget in dollars, both histories for every coin, a graph of each coin's percent change, and a grand total in holdings.
+- A new font, Lexend, replaces the handwriting font everywhere. It ships with the app; nothing is fetched from a font service.
+
 ## 0.3.0 (2026-10-17)
 
 V3, "Multi-Coin", per the V3 PRD.

@@ -6,6 +6,10 @@ import type { BookState } from '../useBook'
 import { isChoosable, type Mode } from './categoryMode'
 import { nameProblem } from './categoryRules'
 import { placeholder } from './placeholder'
+import { useDollars } from '../prices/prices'
+import { sumDollars } from '../prices/money'
+import type { BossData } from './boss'
+import Usd from './Usd'
 
 interface Props {
   budget: BookState
@@ -32,18 +36,9 @@ function chosenAs(mode: Mode | null, id: string): string | null {
 
 export default function CategoriesTable({ budget, mode, onChoose, onName, onSaveName, renamable, onRename }: Props) {
   const nameBox = useRef<HTMLInputElement>(null)
+  const dollars = useDollars()
   const adding = mode?.kind === 'add'
-  const [renaming, setRenaming] = useState<string | null>(null)
-  const hold = useRef<number | undefined>(undefined)
-  const release = () => window.clearTimeout(hold.current)
-  const press = (c: Category) => {
-    release()
-    if (renamable && c.id !== READY_TO_ASSIGN) hold.current = window.setTimeout(() => setRenaming(c.id), HOLD_MS)
-  }
-  useEffect(() => release, [])
-  useEffect(() => {
-    if (!renamable) setRenaming(null)
-  }, [renamable])
+  const { renaming, setRenaming, release, press } = useRename(renamable)
 
   // The new row sits at the bottom of the table; bring it into view with the cursor already in it.
   useEffect(() => {
@@ -88,7 +83,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {c.id === READY_TO_ASSIGN && <small>deposits land here</small>}
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
-                      <td>{budget.coin ? '$-,--' : ''}</td>
+                      <td>{budget.coin ? <Usd value={dollars(c.balance, budget.coin.ticker)} /> : ''}</td>
                       <CoinCell text={budget.coin ? formatAmount(c.balance, budget.coin.decimals) : ''} negative={c.balance < 0n} />
                     </tr>
                   )
@@ -118,7 +113,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                       onKeyDown={e => e.key === 'Enter' && onSaveName()}
                     />
                   </td>
-                  <td>{budget.coin ? '$-,--' : ''}</td>
+                  <td>{budget.coin ? <Usd value={dollars(0n, budget.coin.ticker)} /> : ''}</td>
                   <td>{budget.coin ? 0 : ''}</td>
                 </tr>
               )}
@@ -131,13 +126,80 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
           <div className="c3">{budget.coin?.ticker ?? 'Crypto'}</div>
         </div>
       </section>
-      <div id="tblArrowC" className="comp">
-        <button className="arrow" aria-label="Show all categories" {...placeholder('Coming in a later stage')}>
-          ↓<span className="lab">more</span>
-        </button>
-      </div>
+      <MoreArrow />
     </>
   )
+}
+
+interface BossProps {
+  data: BossData
+  /** Every category, Ready to Assign included, so a rename cannot take another's name. */
+  categories: readonly Category[]
+  renamable: boolean
+  onRename: (id: string, name: string) => string | null
+}
+
+/** The Boss View's budget: each category's total in dollars across every coin. Ready to Assign is not listed. */
+export function BossTable({ data, categories, renamable, onRename }: BossProps) {
+  const dollars = useDollars()
+  const { renaming, setRenaming, release, press } = useRename(renamable)
+  return (
+    <>
+      <section id="tableC" className="comp box" aria-label="Budget categories, every coin">
+        <div id="tblScroll">
+          <table className="bud boss">
+            <tbody>
+              {data.categories.map(c => (
+                <tr key={c.id}>
+                  <td className="cat" onPointerDown={e => e.button === 0 && press(c)} onPointerUp={release} onPointerLeave={release}>
+                    {renaming === c.id ? (
+                      <RenameBox category={c} categories={categories} onSave={name => onRename(c.id, name)} onDone={() => setRenaming(null)} />
+                    ) : (
+                      c.name
+                    )}
+                  </td>
+                  <td>
+                    <Usd value={sumDollars(c.balances.map(b => dollars(b.units, b.ticker)))} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="tfoot">
+          <div className="c1">category</div>
+          <div className="c2 wide">USD</div>
+        </div>
+      </section>
+      <MoreArrow />
+    </>
+  )
+}
+
+function MoreArrow() {
+  return (
+    <div id="tblArrowC" className="comp">
+      <button className="arrow" aria-label="Show all categories" {...placeholder('Coming in a later stage')}>
+        ↓<span className="lab">more</span>
+      </button>
+    </div>
+  )
+}
+
+/** A click held on a category name opens it for renaming, but only while `renamable`. */
+function useRename(renamable: boolean) {
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const hold = useRef<number | undefined>(undefined)
+  const release = () => window.clearTimeout(hold.current)
+  const press = (c: Category) => {
+    release()
+    if (renamable && c.id !== READY_TO_ASSIGN) hold.current = window.setTimeout(() => setRenaming(c.id), HOLD_MS)
+  }
+  useEffect(() => release, [])
+  useEffect(() => {
+    if (!renamable) setRenaming(null)
+  }, [renamable])
+  return { renaming, setRenaming, release, press }
 }
 
 interface RenameProps {
@@ -199,7 +261,7 @@ function RenameBox({ category, categories, onSave, onDone }: RenameProps) {
 
 /** A coin amount in the table, shrunk to fit when it is long. */
 function CoinCell({ text, negative }: { text: string; negative: boolean }) {
-  const size = fitFont(text, 20, 19)
+  const size = fitFont(text, 17, 19)
   return (
     <td className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
       {text}

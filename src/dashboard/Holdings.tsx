@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { formatShort } from '../ledger/amount'
 import { COINS, type Coin } from '../ledger/coins'
 import { fitFont } from './fit'
+import { useDollars } from '../prices/prices'
+import { sumDollars } from '../prices/money'
+import Usd from './Usd'
 
 export interface Holding {
   coin: Coin
@@ -14,14 +17,17 @@ interface Props {
   blocked: string | null
   onAdd: () => void
   onDelete: (ticker: string) => void
+  /** In the Boss View, a grand total in dollars follows the last coin. */
+  boss: boolean
 }
 
 /**
  * One row per added coin, in ticker order, then "+ Add a Currency". Each row's 3-dot button opens a menu whose only
  * option is Delete. The box scrolls, so the menu is drawn outside it, level with its row.
  */
-export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) {
+export default function Holdings({ holdings, blocked, onAdd, onDelete, boss }: Props) {
   const [menu, setMenu] = useState<{ ticker: string; top: number } | null>(null)
+  const dollars = useDollars()
   const box = useRef<HTMLElement>(null)
   const full = holdings.length === COINS.length
 
@@ -56,7 +62,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) 
         {holdings.map(({ coin, total }) => (
           <div key={coin.ticker} className="hrow mrow">
             <Total text={`${formatShort(total, coin.decimals)} ${coin.ticker}`} negative={total < 0n} />
-            <small>$-,--</small>
+            <small><Usd value={dollars(total, coin.ticker)} muted /></small>
             <button
               type="button"
               className={blocked ? 'dots dull' : 'dots'}
@@ -75,6 +81,12 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) 
             </button>
           </div>
         ))}
+        {boss && (
+          <div className="hrow grand">
+            <small>total</small>
+            <Usd value={sumDollars(holdings.map(h => dollars(h.total, h.coin.ticker)))} />
+          </div>
+        )}
         <button
           type="button"
           className={blocked || full ? 'hrow addCoin dull' : 'hrow addCoin'}
@@ -105,7 +117,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete }: Props) 
 
 /** A coin's total, shrunk to fit beside the 3-dot button when it is long. */
 function Total({ text, negative }: { text: string; negative: boolean }) {
-  const size = fitFont(text, 12, 18)
+  const size = fitFont(text, 11, 18)
   return (
     <span className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
       {text}
