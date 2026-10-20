@@ -6,7 +6,7 @@ import { MAX_NOTE_LENGTH, type Category, type Snapshot } from '../ledger/ledger'
 import { editableFrom, entryDate, nextField, type EditMode, type EntryMode, type Mode, type MoveField, type MoveMode, type SpendField, type SpendMode } from './categoryMode'
 import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
 import { useDollars } from '../prices/prices'
-import Usd from './Usd'
+import Usd, { FittedUsd } from './Usd'
 
 /** The dollar box: the typed coin amount at today's price. An empty amount is $0.00; one still being typed, $-,--. */
 function typedDollars(amount: string, coin: Coin, dollars: ReturnType<typeof useDollars>) {
@@ -174,7 +174,7 @@ function MoveFields({ mode, coin, fromName, toName, problem, ready, onChange, on
     <div className="popGrid">
       <Field label="From" value={fromName} active={mode.active === 'from'} onFocus={() => activate('from')} />
       <div className="fld num usd" aria-label="US dollars">
-        <Usd value={typedDollars(mode.amount, coin, dollars)} />
+        <FittedUsd value={typedDollars(mode.amount, coin, dollars)} />
       </div>
       <AmountBox
         label={`${coin.ticker} to move`}
@@ -228,7 +228,7 @@ function EntryFields({ mode, coin, snapshot, problem, ready, onChange, onSave }:
         <div />
       )}
       <div className="fld num usd" aria-label="US dollars">
-        <Usd value={typedDollars(mode.amount, coin, dollars)} />
+        <FittedUsd value={typedDollars(mode.amount, coin, dollars)} />
       </div>
       <AmountBox
         label={`${coin.ticker} to ${mode.kind === 'edit' ? (mode.spend ? 'spend' : 'deposit') : mode.kind}`}

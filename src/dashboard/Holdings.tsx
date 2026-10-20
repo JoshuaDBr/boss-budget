@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatShort } from '../ledger/amount'
 import { COINS, type Coin } from '../ledger/coins'
-import { fitFont } from './fit'
 import { useDollars } from '../prices/prices'
 import { sumDollars } from '../prices/money'
-import Usd from './Usd'
+import Fitted from './Fitted'
+import { FittedUsd } from './Usd'
 
 export interface Holding {
   coin: Coin
@@ -62,7 +62,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete, boss }: P
         {holdings.map(({ coin, total }) => (
           <div key={coin.ticker} className="hrow mrow">
             <Total text={`${formatShort(total, coin.decimals)} ${coin.ticker}`} negative={total < 0n} />
-            <small><Usd value={dollars(total, coin.ticker)} muted /></small>
+            <small><FittedUsd value={dollars(total, coin.ticker)} muted shrink /></small>
             <button
               type="button"
               className={blocked ? 'dots dull' : 'dots'}
@@ -84,7 +84,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete, boss }: P
         {boss && (
           <div className="hrow grand">
             <small>total</small>
-            <Usd value={sumDollars(holdings.map(h => dollars(h.total, h.coin.ticker)))} />
+            <FittedUsd value={sumDollars(holdings.map(h => dollars(h.total, h.coin.ticker)))} shrink />
           </div>
         )}
         <button
@@ -115,12 +115,7 @@ export default function Holdings({ holdings, blocked, onAdd, onDelete, boss }: P
   )
 }
 
-/** A coin's total, shrunk to fit beside the 3-dot button when it is long. */
+/** A coin's total, shrunk to fit beside the 3-dot button when it is long, then shortened (see fit.ts). */
 function Total({ text, negative }: { text: string; negative: boolean }) {
-  const size = fitFont(text, 11, 18)
-  return (
-    <span className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
-      {text}
-    </span>
-  )
+  return <Fitted text={text} className={negative ? 'neg' : undefined} shrink />
 }

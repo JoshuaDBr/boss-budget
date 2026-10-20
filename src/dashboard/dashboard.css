@@ -219,3 +219,14 @@ table.bud tr.draft td + td { color: var(--ink3); }
 .fld.amt input { text-align: right; }
 /* the failed-refresh pop-up: small, centered, gone after 3 seconds */
 #offline { left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 12; width: 300px; padding: 16px 20px; font-size: 16px; text-align: center; line-height: 1.35; box-shadow: 3px 4px 0 var(--ink3); }
+
+/* 0.4.1: long values, fitted to their box (see fit.ts and Fitted.tsx) */
+.fitted { display: flex; justify-content: flex-end; align-items: center; gap: 4px; width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; }
+.fittedText { overflow: hidden; }
+.hrow .fitted { justify-content: flex-start; }
+.hrow.grand .fitted { flex: 1; width: auto; justify-content: flex-end; }
+.expand { flex: none; display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--ink2); cursor: pointer; }
+.expand:hover { color: var(--ink); background: #f0f0eb; }
+.expand svg { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.bubble { position: fixed; z-index: 20; transform: translateX(-100%); padding: 5px 9px; border: 1.4px solid var(--ink); border-radius: 6px; background: #fff; box-shadow: 2px 3px 0 var(--ink3); font-size: 15px; line-height: 1.2; white-space: nowrap; color: var(--ink); }
+.bubble.neg { color: #c0392b; }
