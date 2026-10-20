@@ -2,6 +2,21 @@
 
 Boss Budget follows [Semantic Versioning](https://semver.org): MAJOR.MINOR.PATCH. While the major number is 0, the app is in alpha: features are still arriving and saved data may be reset. Each PRD generation is a minor version (V1 = 0.1, V2 = 0.2), and bug fixes are patches.
 
+## 0.4.1 (2026-10-19)
+
+Bug fixes.
+
+- Long amounts no longer spill out of their boxes. The table, both full histories, the Boss table and the pop-up dollar box keep their font size and show a value that does not fit in letters ($12.35M, 1.23K) or cut short with "…", with an expand button that opens a bubble with the full value. The corner box and holdings first shrink the font, then do the same, with no button.
+- Transactions entered on the same day stay in the order they were entered, even after one is deleted, in every history and in the Boss View. Each new transaction records the time it was entered, to the second; older ones keep their order.
+- The delete-category warning names every coin with money or a deficit in the category, not only the coin on screen.
+- Refresh counts down to 7 seconds after its last request. It finishes as soon as the last price arrives; if the countdown ends first, three dots pulse until it does.
+- "5." and ".5" are read as 5 and 0.5.
+- The Yes and No confirmation opens with the cursor on Yes: Enter answers it, Tab moves to No, Escape cancels.
+- The new category row shows the coin's zero in full (0.000000000000), like the other rows.
+- Amounts are limited to 12 whole-number digits, in every amount box and in the ledger.
+- A note's 30-character limit counts an emoji as one character.
+- Two very fast changes can no longer lose one of them.
+
 ## 0.4.0 (2026-10-18)
 
 V4, "Live Prices and the Boss View", per the V4 PRD.
