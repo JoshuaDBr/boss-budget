@@ -17,6 +17,15 @@ export function todayIso(now: Date = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
+/** The time of day on this device, to the second, as "hh:mm:ss" (24-hour). */
+export function clockTime(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+}
+
+/** Whether text is a real time of day in "hh:mm:ss" form. */
+export const isClockTime = (text: string) => /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(text)
+
 /** "2026-10-14" → "10/14/2026". */
 export function isoToUs(iso: string): string {
   const [year, month, day] = iso.split('-')

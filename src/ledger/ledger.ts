@@ -1,5 +1,5 @@
-import { isIsoDate, todayIso } from './dates'
-import { formatAmount } from './amount'
+import { clockTime, isClockTime, isIsoDate, todayIso } from './dates'
+import { formatAmount, MAX_WHOLE_DIGITS, tooLarge } from './amount'
 import { findCoin } from './coins'
 
 // The budget is an append-only list of entries. Balances are never stored or
@@ -30,8 +30,9 @@ export type Entry =
   | { kind: 'addCategory'; id: string; name: string }
   | { kind: 'deleteCategory'; id: string }
   | { kind: 'renameCategory'; id: string; name: string }
-  | ({ kind: 'deposit'; id: string; amount: bigint } & Details)
-  | ({ kind: 'spend'; id: string; from: string; amount: bigint } & Details)
+  /** `time` is when it was entered (see Transaction). Entries saved before 0.4.1 have none. */
+  | ({ kind: 'deposit'; id: string; amount: bigint; time?: string } & Details)
+  | ({ kind: 'spend'; id: string; from: string; amount: bigint; time?: string } & Details)
   | { kind: 'move'; from: string; to: string; amount: bigint }
   /** Changes a past deposit or spend. `from` is given for a spend and left out for a deposit. */
   | ({ kind: 'editTransaction'; id: string; from?: string; amount: bigint } & Details)
@@ -44,7 +45,15 @@ export interface Transaction extends Details {
   /** The category a spend came from. It may since have been deleted, which leaves the spend unassigned. */
   from?: string
   amount: bigint
-  /** Position in the order the transactions were first recorded. */
+  /**
+   * The time of day it was entered, to the second ("14:05:09"). The newest-first order sorts by date, then by this.
+   * Edits keep it, even when they change the date. Left out for transactions saved before 0.4.1.
+   */
+  time?: string
+  /**
+   * Its place among the transactions recorded so far, counted when it was recorded. A delete frees a number for reuse,
+   * so this only breaks ties, mainly between transactions saved before 0.4.1, which have no time.
+   */
   order: number
 }
 
@@ -185,8 +194,20 @@ export function snapshot(budget: Budget): Snapshot {
         if (entry.kind === 'spend') take(spendable(entry.from), entry.amount)
         else existing(READY_TO_ASSIGN).balance += entry.amount
         total += entry.kind === 'spend' ? -entry.amount : entry.amount
-        const { id, kind, amount, note, date } = entry
-        transactions.set(id, { id, kind, amount, note, date, order: transactions.size, ...(entry.kind === 'spend' && { from: entry.from }) })
+        if (entry.time !== undefined && (typeof entry.time !== 'string' || !isClockTime(entry.time))) {
+          throw new BudgetError(`Invalid time: ${entry.time}`)
+        }
+        const { id, kind, amount, note, date, time } = entry
+        transactions.set(id, {
+          id,
+          kind,
+          amount,
+          note,
+          date,
+          ...(time !== undefined && { time }),
+          order: transactions.size,
+          ...(entry.kind === 'spend' && { from: entry.from }),
+        })
         break
       }
       case 'editTransaction': {
@@ -235,8 +256,16 @@ export function checkGuardrail({ categories, total }: Pick<Snapshot, 'categories
   }
 }
 
-/** Appends an entry only if the budget still replays cleanly with it. The original budget is never modified. */
+/**
+ * Appends an entry only if the budget still replays cleanly with it. The original budget is never modified.
+ * A new amount may have at most 12 whole-number digits in its coin. Only new entries are held to this, so a budget
+ * saved before 0.4.1 with a larger amount still loads.
+ */
 function apply(budget: Budget, entry: Entry): Budget {
+  const coin = budget.coin === undefined ? undefined : findCoin(budget.coin)
+  if ('amount' in entry && coin && entry.amount >= tooLarge(coin.decimals)) {
+    throw new BudgetError(`Amounts are limited to ${MAX_WHOLE_DIGITS} whole-number digits`)
+  }
   const next = { ...budget, entries: [...budget.entries, entry] }
   snapshot(next)
   return next
@@ -254,11 +283,18 @@ export const renameCategory = (budget: Budget, id: string, name: string) =>
   apply(budget, { kind: 'renameCategory', id, name: name.trim() })
 const noDetails = (): Details => ({ note: '', date: todayIso() })
 
-export const deposit = (budget: Budget, amount: bigint, details: Details = noDetails(), id: string = newId()) =>
-  apply(budget, { kind: 'deposit', id, amount, ...details })
-export const spend = (budget: Budget, from: string, amount: bigint, details: Details = noDetails(), id: string = newId()) =>
-  apply(budget, { kind: 'spend', id, from, amount, ...details })
-/** Changes a past deposit or spend in place. Give `from` for a spend; leave it out for a deposit. */
+// A new deposit or spend records the moment it is entered, to the second, unless a time is given.
+export const deposit = (budget: Budget, amount: bigint, details: Details = noDetails(), id: string = newId(), time: string = clockTime()) =>
+  apply(budget, { kind: 'deposit', id, amount, ...details, time })
+export const spend = (
+  budget: Budget,
+  from: string,
+  amount: bigint,
+  details: Details = noDetails(),
+  id: string = newId(),
+  time: string = clockTime(),
+) => apply(budget, { kind: 'spend', id, from, amount, ...details, time })
+/** Changes a past deposit or spend in place, keeping its time. Give `from` for a spend; leave it out for a deposit. */
 export const editTransaction = (budget: Budget, id: string, change: { from?: string; amount: bigint } & Details) =>
   apply(budget, { kind: 'editTransaction', id, ...change })
 export const deleteTransaction = (budget: Budget, id: string) => apply(budget, { kind: 'deleteTransaction', id })
