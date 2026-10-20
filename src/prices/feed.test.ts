@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COINS } from '../ledger/coins'
 import { GECKO_ID } from './coingecko'
-import { bossRefreshJobs, coinRefreshJobs, countdownText, Feed, launchJobs, newestTime, remaining, SPACING, type Get } from './feed'
+import { awaitingReply, bossRefreshJobs, coinRefreshJobs, countdownText, CUSHION, Feed, launchJobs, newestTime, remaining, SPACING, type Get } from './feed'
 
 const ALL_PRICES = Object.fromEntries(COINS.map((c, i) => [GECKO_ID[c.ticker], { usd: i + 1 }]))
 const graph = (last: number) => ({ prices: [[0, last - 1], [1, last]] })
@@ -59,10 +59,10 @@ describe('the queue', () => {
     expect(feed.getState().running).toBe(false)
   })
 
-  it('launch counts down from 2:36 with 13 requests', () => {
+  it('launch counts down from 2:43 with 13 requests: 12 spacings, then the 7-second cushion', () => {
     const feed = new Feed(fake(ok).get)
     feed.launch(launchJobs([], null))
-    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('2:36')
+    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('2:43')
   })
 
   it('waits for a slow reply before sending the next request', async () => {
@@ -211,16 +211,44 @@ describe('countdown and label', () => {
     expect(countdownText(0)).toBe('0')
   })
 
-  it('counts to the moment the last request is sent', () => {
-    expect(remaining({ left: 2, nextAt: 5_000 }, 0)).toBe(5_000 + SPACING)
-    expect(remaining({ left: 1, nextAt: -Infinity }, 0)).toBe(0)
-    expect(remaining({ left: 0, nextAt: 0 }, 0)).toBe(0)
+  it('counts to 7 seconds after the moment the last request is sent', () => {
+    expect(remaining({ running: true, left: 2, nextAt: 5_000 }, 0)).toBe(5_000 + SPACING + CUSHION)
+    expect(remaining({ running: true, left: 1, nextAt: -Infinity }, 0)).toBe(CUSHION)
+    // The last request went out 3 seconds ago (nextAt is its time plus the spacing): 4 seconds of cushion are left.
+    expect(remaining({ running: true, left: 0, nextAt: SPACING - 3_000 }, 0)).toBe(4_000)
+    expect(remaining({ running: true, left: 0, nextAt: SPACING - 9_000 }, 0)).toBe(0)
+    expect(remaining({ running: false, left: 0, nextAt: 0 }, 0)).toBe(0)
   })
 
-  it('a coin refresh counts down from 13', () => {
+  it('a coin refresh counts down from 20', () => {
     const feed = new Feed(fake(ok).get)
     feed.refresh(coinRefreshJobs('XMR'))
-    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('13')
+    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('20')
+  })
+
+  it('ends as soon as the last reply arrives, even with seconds left', async () => {
+    const feed = new Feed(fake(ok).get)
+    feed.refresh(coinRefreshJobs('XMR'))
+    await vi.advanceTimersByTimeAsync(SPACING + 1)
+    const state = feed.getState()
+    expect(state.running).toBe(false)
+    expect(remaining(state, Date.now())).toBe(0)
+    expect(awaitingReply(state, Date.now())).toBe(false)
+  })
+
+  it('shows the pulsing dots once the countdown reaches 0 with the last reply still on its way', async () => {
+    const slow = (url: string) => (url.includes('market_chart') ? new Promise(r => setTimeout(() => r(graph(5)), 12_000)) : ok(url))
+    const feed = new Feed(fake(slow).get)
+    feed.refresh(coinRefreshJobs('XMR'))
+    await vi.advanceTimersByTimeAsync(SPACING + CUSHION - 1) // the graph request went out 7 seconds ago, less 1 ms
+    expect(countdownText(remaining(feed.getState(), Date.now()))).toBe('1')
+    expect(awaitingReply(feed.getState(), Date.now())).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(feed.getState().running).toBe(true)
+    expect(awaitingReply(feed.getState(), Date.now())).toBe(true)
+    await vi.advanceTimersByTimeAsync(5_000) // the reply arrives 12 seconds after it was sent
+    expect(feed.getState().running).toBe(false)
+    expect(awaitingReply(feed.getState(), Date.now())).toBe(false)
   })
 
   it('labels the time of the newest price', () => {

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatAmount } from '../ledger/amount'
-import { fitFont } from './fit'
 import { MAX_NAME_LENGTH, READY_TO_ASSIGN, type Category } from '../ledger/ledger'
 import type { BookState } from '../useBook'
 import { isChoosable, type Mode } from './categoryMode'
@@ -9,7 +8,8 @@ import { placeholder } from './placeholder'
 import { useDollars } from '../prices/prices'
 import { sumDollars } from '../prices/money'
 import type { BossData } from './boss'
-import Usd from './Usd'
+import Fitted from './Fitted'
+import { FittedUsd } from './Usd'
 
 interface Props {
   budget: BookState
@@ -83,7 +83,7 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                         {c.id === READY_TO_ASSIGN && <small>deposits land here</small>}
                         {chosen ? <span className="tag">{chosen}</span> : choosable && <span className="pick">select</span>}
                       </td>
-                      <td>{budget.coin ? <Usd value={dollars(c.balance, budget.coin.ticker)} /> : ''}</td>
+                      <td>{budget.coin ? <FittedUsd value={dollars(c.balance, budget.coin.ticker)} /> : ''}</td>
                       <CoinCell text={budget.coin ? formatAmount(c.balance, budget.coin.decimals) : ''} negative={c.balance < 0n} />
                     </tr>
                   )
@@ -113,8 +113,8 @@ export default function CategoriesTable({ budget, mode, onChoose, onName, onSave
                       onKeyDown={e => e.key === 'Enter' && onSaveName()}
                     />
                   </td>
-                  <td>{budget.coin ? <Usd value={dollars(0n, budget.coin.ticker)} /> : ''}</td>
-                  <td>{budget.coin ? 0 : ''}</td>
+                  <td>{budget.coin ? <FittedUsd value={dollars(0n, budget.coin.ticker)} /> : ''}</td>
+                  <CoinCell text={budget.coin ? formatAmount(0n, budget.coin.decimals) : ''} negative={false} />
                 </tr>
               )}
             </tbody>
@@ -159,7 +159,7 @@ export function BossTable({ data, categories, renamable, onRename }: BossProps) 
                     )}
                   </td>
                   <td>
-                    <Usd value={sumDollars(c.balances.map(b => dollars(b.units, b.ticker)))} />
+                    <FittedUsd value={sumDollars(c.balances.map(b => dollars(b.units, b.ticker)))} />
                   </td>
                 </tr>
               ))}
@@ -259,12 +259,11 @@ function RenameBox({ category, categories, onSave, onDone }: RenameProps) {
   )
 }
 
-/** A coin amount in the table, shrunk to fit when it is long. */
+/** A coin amount in the table, shortened when it is too long for its column (see fit.ts). */
 function CoinCell({ text, negative }: { text: string; negative: boolean }) {
-  const size = fitFont(text, 17, 19)
   return (
-    <td className={negative ? 'neg' : undefined} style={size ? { fontSize: size } : undefined}>
-      {text}
+    <td className={negative ? 'neg' : undefined}>
+      <Fitted text={text} />
     </td>
   )
 }

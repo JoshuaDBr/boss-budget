@@ -3,6 +3,7 @@ import { findCoin } from '../ledger/coins'
 import { isoToDigits, todayIso } from '../ledger/dates'
 import { READY_TO_ASSIGN, deleteCategory, deposit, move, snapshot, spend, starterBudget, type Category } from '../ledger/ledger'
 import {
+  answerAfterTab,
   choose,
   confirmsSave,
   deleteChange,
@@ -239,5 +240,16 @@ describe('Tab through the fields', () => {
 
   it('leaves Add, Delete and an open confirmation alone', () => {
     for (const mode of [startAdd(), startDelete(), { ...startSpend(), confirm: 'save' } as Mode]) expect(nextField(mode)).toBe(mode)
+  })
+})
+
+describe('0.4.1: the confirmation keys (B6)', () => {
+  it('opens on Yes; Tab and Shift+Tab go between Yes and No and never leave them', () => {
+    expect(answerAfterTab('yes')).toBe('no')
+    expect(answerAfterTab('no')).toBe('yes')
+    expect(answerAfterTab('yes', true)).toBe('no')
+    expect(answerAfterTab('no', true)).toBe('yes')
+    expect(answerAfterTab(null)).toBe('yes')
+    expect(answerAfterTab(null, true)).toBe('no')
   })
 })

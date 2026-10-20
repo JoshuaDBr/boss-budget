@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatAmount, formatShort, isAmountDraft, parseAmount } from './amount'
+import { formatAmount, formatShort, isAmountDraft, MAX_WHOLE_DIGITS, parseAmount, tooLarge } from './amount'
 import { COINS } from './coins'
 
 // XMR (12 decimal places) carries over V2's tests; the other coins check their own precision.
@@ -17,7 +17,7 @@ describe('parseAmount', () => {
   })
 
   it('rejects anything that is not a plain positive amount with up to 12 decimals', () => {
-    for (const bad of ['', '.', '1.', '.5', '-1', '1.0000000000001', 'abc', '1e3', '1,000', '1 000']) {
+    for (const bad of ['', '.', ' . ', '..5', '5..', '-1', '1.0000000000001', 'abc', '1e3', '1,000', '1 000']) {
       expect(parseXmr(bad), bad).toBeNull()
     }
   })
@@ -30,6 +30,47 @@ describe('parseAmount', () => {
     expect(parseAmount('0.0000001', 6)).toBeNull()
     expect(parseAmount('1.000000000000000001', 18)).toBe(1_000_000_000_000_000_001n)
     expect(parseAmount('0.0000000000000000001', 18)).toBeNull()
+  })
+})
+
+describe('0.4.1: a point with no digit on one side (B5)', () => {
+  it('reads "5." as 5 and ".5" as 0.5, in every coin', () => {
+    expect(parseXmr('5.')).toBe(5_000_000_000_000n)
+    expect(parseXmr('123.')).toBe(123_000_000_000_000n)
+    expect(parseXmr('.5')).toBe(500_000_000_000n)
+    expect(parseXmr('.75')).toBe(750_000_000_000n)
+    expect(parseAmount('.00000001', 8)).toBe(1n)
+    expect(parseAmount('5.', 18)).toBe(5_000_000_000_000_000_000n)
+  })
+
+  it('tidies "5." and ".5" into the coin’s full format, as leaving the box does', () => {
+    expect(formatXmr(parseXmr('5.')!)).toBe('5.000000000000')
+    expect(formatXmr(parseXmr('.5')!)).toBe('0.500000000000')
+    expect(formatAmount(parseAmount('123.', 8)!, 8)).toBe('123.00000000')
+  })
+
+  it('still refuses a lone point', () => {
+    expect(parseXmr('.')).toBeNull()
+    expect(parseAmount('.', 8)).toBeNull()
+  })
+})
+
+describe('0.4.1: at most twelve whole-number digits (B8)', () => {
+  it('reads twelve whole digits and refuses a thirteenth, in every coin', () => {
+    expect(MAX_WHOLE_DIGITS).toBe(12)
+    for (const { ticker, decimals } of COINS) {
+      expect(parseAmount('9'.repeat(12), decimals), ticker).toBe(tooLarge(decimals) - 10n ** BigInt(decimals))
+      expect(parseAmount('1'.repeat(13), decimals), ticker).toBeNull()
+      expect(parseAmount('1'.repeat(13) + '.5', decimals), ticker).toBeNull()
+    }
+  })
+
+  it('lets a twelfth whole digit be typed, but not a thirteenth, the way a thirteenth XMR decimal is refused', () => {
+    expect(isAmountDraft('123456789012', 12)).toBe(true)
+    expect(isAmountDraft('123456789012.123456789012', 12)).toBe(true)
+    expect(isAmountDraft('1234567890123', 12)).toBe(false)
+    expect(isAmountDraft('1234567890123.', 8)).toBe(false)
+    expect(isAmountDraft('' + '9'.repeat(300), 6)).toBe(false)
   })
 })
 

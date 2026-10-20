@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   BudgetError,
   READY_TO_ASSIGN,
@@ -235,5 +235,52 @@ describe('budgets kept in a coin', () => {
 
   it('refuse a coin that is not on the list', () => {
     expect(() => snapshot({ coin: 'DOGE', ...starterBudget() })).toThrow(/Unknown coin/)
+  })
+})
+
+describe('0.4.1: the time of entry (B1)', () => {
+  const on = (date: string) => ({ note: '', date })
+
+  it('is recorded to the second with each new deposit and spend', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 19, 9, 5, 7))
+    try {
+      let budget = move(deposit(starterBudget(), 10n, on('2026-10-19'), 'd'), READY_TO_ASSIGN, 'starter-1', 4n)
+      vi.setSystemTime(new Date(2026, 9, 19, 14, 30, 59))
+      budget = spend(budget, 'starter-1', 1n, on('2026-10-19'), 's')
+      expect(snapshot(budget).transactions.map(t => t.time)).toEqual(['09:05:07', '14:30:59'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('is kept by every edit, including one that changes the date', () => {
+    let budget = deposit(starterBudget(), 10n, on('2026-10-12'), 'd', '08:00:00')
+    budget = editTransaction(budget, 'd', { amount: 12n, note: 'pay', date: '2026-10-15' })
+    const [t] = snapshot(budget).transactions
+    expect(t).toMatchObject({ date: '2026-10-15', time: '08:00:00', amount: 12n, note: 'pay' })
+  })
+
+  it('is optional, so entries saved before 0.4.1 still replay, and a malformed time is refused', () => {
+    const old = { entries: [...starterBudget().entries, { kind: 'deposit' as const, id: 'old', amount: 5n, note: '', date: '2026-10-01' }] }
+    expect(snapshot(old).transactions[0]).not.toHaveProperty('time')
+    expect(() => deposit(starterBudget(), 1n, on('2026-10-01'), 'x', '25:00:00')).toThrow('Invalid time')
+  })
+})
+
+describe('0.4.1: at most twelve whole-number digits (B8)', () => {
+  const xmr = () => ({ coin: 'XMR', ...starterBudget() })
+  const units = (whole: string) => BigInt(whole + '0'.repeat(12)) // XMR has 12 decimal places
+
+  it('accepts 999,999,999,999 and refuses a thirteenth digit, in deposits and edits', () => {
+    const budget = deposit(xmr(), units('999999999999'), { note: '', date: '2026-10-01' }, 'd')
+    expect(snapshot(budget).total).toBe(units('999999999999'))
+    expect(() => deposit(xmr(), units('1000000000000'))).toThrow('Amounts are limited to 12 whole-number digits')
+    expect(() => editTransaction(budget, 'd', { amount: units('1000000000000'), note: '', date: '2026-10-01' })).toThrow(/12 whole-number/)
+  })
+
+  it('still loads a budget saved before the limit with a larger amount', () => {
+    const big = { kind: 'deposit' as const, id: 'big', amount: units('1' + '0'.repeat(14)), note: '', date: '2026-10-01' }
+    expect(snapshot({ ...xmr(), entries: [...xmr().entries, big] }).total).toBe(big.amount)
   })
 })

@@ -2,11 +2,11 @@ import { useEffect, useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { formatDateDigits } from '../ledger/dates'
 import { formatAmount, formatShort, isAmountDraft, parseAmount } from '../ledger/amount'
 import type { Coin } from '../ledger/coins'
-import { MAX_NOTE_LENGTH, type Category, type Snapshot } from '../ledger/ledger'
-import { editableFrom, entryDate, nextField, type EditMode, type EntryMode, type Mode, type MoveField, type MoveMode, type SpendField, type SpendMode } from './categoryMode'
-import { checkAmount, deleteMessage, nameProblem } from './categoryRules'
+import type { Category, Snapshot } from '../ledger/ledger'
+import { answerAfterTab, editableFrom, entryDate, nextField, type EditMode, type EntryMode, type Mode, type MoveField, type MoveMode, type SpendField, type SpendMode } from './categoryMode'
+import { capNote, checkAmount, deleteMessage, nameProblem } from './categoryRules'
 import { useDollars } from '../prices/prices'
-import Usd from './Usd'
+import Usd, { FittedUsd } from './Usd'
 
 /** The dollar box: the typed coin amount at today's price. An empty amount is $0.00; one still being typed, $-,--. */
 function typedDollars(amount: string, coin: Coin, dollars: ReturnType<typeof useDollars>) {
@@ -30,6 +30,8 @@ interface Props {
   onCancel: () => void
   /** Yes on a confirmation. */
   onConfirm: () => void
+  /** The coins in which a category holds a balance, for the Delete a category warning (see holders). */
+  holders: (id: string) => string[]
 }
 
 const LABELS = { add: 'Add a category', move: 'Move', delete: 'Delete a category', deposit: 'Deposit', spend: 'Spend' }
@@ -44,14 +46,28 @@ function label(mode: Mode, coin: Coin | null) {
   return coin && (mode.kind === 'move' || mode.kind === 'deposit' || mode.kind === 'spend') ? `${name} ${coin.ticker}` : name
 }
 
-export default function CategoryPopup({ snapshot, coin, mode, ready, error, onChange, onSave, onCancel, onConfirm }: Props) {
+export default function CategoryPopup({ snapshot, coin, mode, ready, error, onChange, onSave, onCancel, onConfirm, holders }: Props) {
   const nameOf = (id?: string) => snapshot.categories.find(c => c.id === id)?.name
   const entry = mode.kind === 'deposit' || mode.kind === 'spend' || mode.kind === 'edit' ? mode : null
   const asking = entry?.confirm !== undefined && entry.confirm
+  const yes = useRef<HTMLButtonElement>(null)
+  const no = useRef<HTMLButtonElement>(null)
+
+  // A confirmation opens with the cursor on Yes, so Enter answers it and Escape (like Cancel) backs out.
+  useEffect(() => {
+    if (asking) yes.current?.focus()
+  }, [asking])
 
   // Tab and Shift+Tab step through the fields. Leaving the amount writes it out to every decimal place, as clicking away does.
+  // On a confirmation they go between No and Yes.
   const tab = (e: KeyboardEvent) => {
     if (e.key !== 'Tab') return
+    if (asking) {
+      e.preventDefault()
+      const on = document.activeElement === yes.current ? 'yes' : document.activeElement === no.current ? 'no' : null
+      ;(answerAfterTab(on, e.shiftKey) === 'yes' ? yes : no).current?.focus()
+      return
+    }
     const next = nextField(mode, e.shiftKey)
     if (next === mode) return
     e.preventDefault()
@@ -97,13 +113,13 @@ export default function CategoryPopup({ snapshot, coin, mode, ready, error, onCh
             Delete
           </button>
         )}
-        <div className={error ? 'popNote err' : 'popNote'}>{error ?? (asking ? '' : note(mode, snapshot, coin))}</div>
+        <div className={error ? 'popNote err' : 'popNote'}>{error ?? (asking ? '' : note(mode, snapshot, coin, holders))}</div>
         {entry && asking ? (
           <>
-            <button type="button" className="pb" onClick={() => onChange({ ...entry, confirm: undefined })}>
+            <button ref={no} type="button" className="pb" onClick={() => onChange({ ...entry, confirm: undefined })}>
               No
             </button>
-            <button type="button" className="pb main" onClick={onConfirm}>
+            <button ref={yes} type="button" className="pb main" onClick={onConfirm}>
               Yes
             </button>
           </>
@@ -138,7 +154,7 @@ function confirmedAmount(mode: EntryMode, snapshot: Snapshot, coin: Coin): bigin
  * The line beside the buttons. It only speaks up for a duplicate name, a move or spend larger than the
  * From balance, and the delete confirmation; otherwise it is empty.
  */
-function note(mode: Mode, snapshot: Snapshot, coin: Coin | null): string {
+function note(mode: Mode, snapshot: Snapshot, coin: Coin | null, holders: (id: string) => string[]): string {
   switch (mode.kind) {
     case 'add':
       return nameProblem(mode.name, snapshot.categories) === 'duplicate' ? 'A category with that name already exists.' : ''
@@ -150,7 +166,7 @@ function note(mode: Mode, snapshot: Snapshot, coin: Coin | null): string {
       return coin ? (checkAmount(mode.amount, coin, snapshot.categories.find(c => c.id === mode.from)).problem ?? '') : ''
     case 'delete': {
       const category = snapshot.categories.find(c => c.id === mode.id)
-      return category ? deleteMessage(category, coin) : ''
+      return category ? deleteMessage(category.name, holders(category.id)) : ''
     }
   }
 }
@@ -174,7 +190,7 @@ function MoveFields({ mode, coin, fromName, toName, problem, ready, onChange, on
     <div className="popGrid">
       <Field label="From" value={fromName} active={mode.active === 'from'} onFocus={() => activate('from')} />
       <div className="fld num usd" aria-label="US dollars">
-        <Usd value={typedDollars(mode.amount, coin, dollars)} />
+        <FittedUsd value={typedDollars(mode.amount, coin, dollars)} />
       </div>
       <AmountBox
         label={`${coin.ticker} to move`}
@@ -228,7 +244,7 @@ function EntryFields({ mode, coin, snapshot, problem, ready, onChange, onSave }:
         <div />
       )}
       <div className="fld num usd" aria-label="US dollars">
-        <Usd value={typedDollars(mode.amount, coin, dollars)} />
+        <FittedUsd value={typedDollars(mode.amount, coin, dollars)} />
       </div>
       <AmountBox
         label={`${coin.ticker} to ${mode.kind === 'edit' ? (mode.spend ? 'spend' : 'deposit') : mode.kind}`}
@@ -304,7 +320,16 @@ interface TextProps {
   onEnter: () => void
 }
 
-/** The optional note, up to 30 characters. */
+/** The optional note, up to 30 characters, counted as the ledger counts them (see capNote). */
+/**
+ * Enter in a field saves. Its key press is cancelled: Save may open a confirmation and move the cursor to Yes, and the
+ * same press must not then reach Yes and answer it.
+ */
+function pressEnter(e: KeyboardEvent, onEnter: () => void) {
+  e.preventDefault()
+  onEnter()
+}
+
 function NoteBox({ value, active, onActivate, onChange, onEnter }: TextProps & { value: string; onChange: (note: string) => void }) {
   const box = useFocusWhen<HTMLInputElement>(active)
   return (
@@ -313,11 +338,10 @@ function NoteBox({ value, active, onActivate, onChange, onEnter }: TextProps & {
       <input
         ref={box}
         value={value}
-        maxLength={MAX_NOTE_LENGTH}
         autoComplete="off"
         onFocus={onActivate}
-        onChange={e => onChange(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && onEnter()}
+        onChange={e => onChange(capNote(e.target.value, value))}
+        onKeyDown={e => e.key === 'Enter' && pressEnter(e, onEnter)}
       />
     </label>
   )
@@ -358,7 +382,7 @@ function DateBox({ digits, active, onActivate, onChange, onEnter }: TextProps & 
           onChange(typed.replace(/\D/g, '').slice(0, 8))
         }}
         onKeyDown={e => {
-          if (e.key === 'Enter') onEnter()
+          if (e.key === 'Enter') pressEnter(e, onEnter)
           // Backspace just after a slash deletes the digit before it.
           const input = e.currentTarget
           const at = input.selectionStart ?? 0
@@ -418,7 +442,7 @@ function AmountBox({ label, coin, value, active, problem, onActivate, onChange, 
         onFocus={() => !active && onActivate()}
         onChange={e => isAmountDraft(e.target.value, coin.decimals) && onChange(e.target.value)}
         onBlur={() => units !== null && onChange(formatAmount(units, coin.decimals))}
-        onKeyDown={e => e.key === 'Enter' && onEnter()}
+        onKeyDown={e => e.key === 'Enter' && pressEnter(e, onEnter)}
       />
     </label>
   )

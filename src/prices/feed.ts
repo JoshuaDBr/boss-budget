@@ -4,11 +4,17 @@
 // The launch queue keeps each result as it arrives; if a request fails, the rest of the queue is dropped. A refresh
 // holds its results apart from the loaded ones: they show as they arrive, are kept once the whole refresh succeeds,
 // and are thrown away if any request in it fails, which puts back the prices (and graphs) loaded before it.
+//
+// The countdown runs to 7 seconds (the cushion) after the last request is sent, the usual wait for its reply. The
+// refresh ends as soon as that reply arrives, even with seconds left. If the countdown reaches 0 first, three pulsing
+// dots show until the reply arrives.
 
 import { COINS } from '../ledger/coins'
 import { graphUrl, parseGraph, parsePrices, pricesUrl } from './coingecko'
 
 export const SPACING = 13_000
+/** How long the countdown allows for the last reply, after the last request is sent. */
+export const CUSHION = 7_000
 
 export type Job = { kind: 'prices' } | { kind: 'graph'; ticker: string }
 
@@ -191,11 +197,19 @@ export class Feed {
   }
 }
 
-/** Milliseconds until the last waiting request is sent; 0 while only the last reply is awaited. */
-export function remaining(state: Pick<FeedState, 'left' | 'nextAt'>, now: number) {
-  if (!state.left) return 0
-  return Math.max(now, state.nextAt) + SPACING * (state.left - 1) - now
+/**
+ * Milliseconds the countdown shows: until the last waiting request is sent, plus the cushion. Once the last request
+ * is sent, until the cushion after it runs out; 0 when nothing is running.
+ */
+export function remaining(state: Pick<FeedState, 'running' | 'left' | 'nextAt'>, now: number) {
+  if (!state.running) return 0
+  if (!state.left) return Math.max(0, state.nextAt - SPACING + CUSHION - now)
+  return Math.max(now, state.nextAt) + SPACING * (state.left - 1) + CUSHION - now
 }
+
+/** Whether the countdown has reached 0 with the last reply still on its way: the pulsing dots show instead. */
+export const awaitingReply = (state: Pick<FeedState, 'running' | 'left' | 'nextAt'>, now: number) =>
+  state.running && remaining(state, now) === 0
 
 /** 2:36 until under a minute, then 59. Whole seconds, rounded up. */
 export function countdownText(ms: number) {

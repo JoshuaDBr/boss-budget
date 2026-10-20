@@ -10,6 +10,7 @@ import CategoriesTable, { BossTable } from './CategoriesTable'
 import CategoryActions from './CategoryActions'
 import CategoryPopup from './CategoryPopup'
 import { choose, confirmsSave, deleteChange, pendingChange, scopeOf, startEdit, type Mode } from './categoryMode'
+import { holders } from './categoryRules'
 import CoinPopup, { type CoinPop } from './CoinPopups'
 import CoinWheel from './CoinWheel'
 import DayRangeWheel from './DayRangeWheel'
@@ -205,6 +206,7 @@ export default function Dashboard({ store }: { store: BookStore }) {
           onSave={save}
           onCancel={cancel}
           onConfirm={confirm}
+          holders={id => (state.book ? holders(state.book, id) : [])}
         />
       )}
       {coinPop && (
