@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { countdownText, newestTime, remaining, type FeedState } from '../prices/feed'
+import { awaitingReply, countdownText, newestTime, remaining, type FeedState } from '../prices/feed'
 
 interface Props {
   feed: FeedState
@@ -8,7 +8,7 @@ interface Props {
 
 /**
  * The refresh button. While the launch queue or a refresh is running, a countdown replaces the icon and the button
- * cannot be clicked. The label under it shows the time of the newest price.
+ * cannot be clicked; past 0, three pulsing dots wait for the last reply. The label under it shows the time of the newest price.
  */
 export default function Refresh({ feed, onRefresh }: Props) {
   const now = useNow(feed.running)
@@ -22,7 +22,13 @@ export default function Refresh({ feed, onRefresh }: Props) {
         aria-disabled={feed.running || undefined}
         onClick={() => !feed.running && onRefresh()}
       >
-        {feed.running ? (
+        {feed.running && awaitingReply(feed, now) ? (
+          <span className="waitDots" role="timer" aria-label="Waiting for the last price">
+            <i />
+            <i />
+            <i />
+          </span>
+        ) : feed.running ? (
           <span className="countdown" role="timer">{countdownText(remaining(feed, now))}</span>
         ) : (
           <svg viewBox="0 0 60 60" aria-hidden="true">

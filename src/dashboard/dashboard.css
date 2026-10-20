@@ -15,6 +15,12 @@ svg text { font-family: var(--font); }
 #refreshBtn { width: 84px; height: 84px; border: 1.6px solid var(--ink); border-radius: 14px 9px 16px 8px; display: flex; align-items: center; justify-content: center; background: #fff; }
 #refreshBtn svg { width: 60px; height: 60px; }
 .countdown { font-size: 30px; line-height: 1; color: var(--ink); }
+/* past 0 with the last reply still on its way: three dots pulsing one after another */
+.waitDots { display: flex; gap: 7px; }
+.waitDots i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink); opacity: 0.2; animation: waitPulse 1.2s infinite ease-in-out; }
+.waitDots i:nth-child(2) { animation-delay: 0.4s; }
+.waitDots i:nth-child(3) { animation-delay: 0.8s; }
+@keyframes waitPulse { 0%, 60%, 100% { opacity: 0.2; transform: scale(0.85); } 30% { opacity: 1; transform: scale(1.1); } }
 #refreshBtn[aria-disabled] { cursor: default; }
 #updated { font-size: 11px; color: var(--ink2); white-space: nowrap; position: absolute; top: 118px; left: 0; width: 150px; }
 
