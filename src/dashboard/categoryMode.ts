@@ -180,3 +180,11 @@ export const scopeOf = (mode: Mode): Scope => (mode.kind === 'add' || mode.kind 
 
 /** Deposit, Spend and edits confirm before saving; Add, Move and Delete Category do not. */
 export const confirmsSave = (mode: Mode): mode is EntryMode => mode.kind === 'deposit' || mode.kind === 'spend' || mode.kind === 'edit'
+
+export type Answer = 'yes' | 'no'
+
+/**
+ * Where Tab (or Shift+Tab, `back`) moves the cursor on a confirmation. The question opens with the cursor on Yes; Tab
+ * goes between No and Yes and never leaves them.
+ */
+export const answerAfterTab = (on: Answer | null, back = false): Answer => (on === null ? (back ? 'no' : 'yes') : on === 'yes' ? 'no' : 'yes')

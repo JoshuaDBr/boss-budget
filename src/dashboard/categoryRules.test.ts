@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { findCoin } from '../ledger/coins'
-import { READY_TO_ASSIGN, type Category } from '../ledger/ledger'
-import { canDelete, canMoveFrom, canMoveTo, checkAmount, deleteMessage, nameProblem } from './categoryRules'
+import { addCoin, changeCoin, starterBook, type Book } from '../ledger/book'
+import { READY_TO_ASSIGN, deposit, editTransaction, move, spend, type Category } from '../ledger/ledger'
+import { canDelete, canMoveFrom, canMoveTo, capNote, checkAmount, deleteMessage, holders, nameProblem } from './categoryRules'
 
 const ready: Category = { id: READY_TO_ASSIGN, name: 'Ready to Assign', balance: 5_000_000_000_000n }
 const groceries: Category = { id: 'g', name: 'Groceries', balance: 12_500_000_000_000n }
@@ -65,11 +66,61 @@ describe('delete', () => {
     expect(canDelete(gas)).toBe(true)
   })
 
-  it('warns how much XMR returns to Ready to Assign, leaving that sentence out at 0 XMR', () => {
-    expect(deleteMessage(groceries, XMR)).toBe(
-      'Are you sure that you want to delete Groceries? 12.500000000000 XMR will be moved to Ready to Assign, and past transactions may become unassigned.',
+})
+
+describe('0.4.1: the delete warning names every coin holding a balance (B2)', () => {
+  const tail = 'All balances and deficits will be moved to "Ready to Assign," and past transactions may become unassigned.'
+
+  it('lists four coins with the Oxford comma', () => {
+    expect(deleteMessage('Food', ['BTC', 'ETH', 'XMR', 'XTM'])).toBe(
+      `Are you sure that you want to delete "Food"? BTC, ETH, XMR, and XTM currently hold balances in this category. ${tail}`,
     )
-    expect(deleteMessage(gas, XMR)).toBe('Are you sure that you want to delete Gas? Past transactions may become unassigned.')
-    expect(deleteMessage(groceries, null)).toBe('Are you sure that you want to delete Groceries? Past transactions may become unassigned.')
+  })
+
+  it('joins two coins with "and", and speaks of one coin in the singular', () => {
+    expect(deleteMessage('Food', ['BTC', 'ETH'])).toBe(
+      `Are you sure that you want to delete "Food"? BTC and ETH currently hold balances in this category. ${tail}`,
+    )
+    expect(deleteMessage('Food', ['XMR'])).toBe(
+      `Are you sure that you want to delete "Food"? XMR currently holds a balance in this category. ${tail}`,
+    )
+  })
+
+  it('leaves the balance sentence out when no coin holds one', () => {
+    expect(deleteMessage('Food', [])).toBe('Are you sure that you want to delete "Food"? Past transactions may become unassigned.')
+  })
+
+  it('counts deficits as well as balances, alphabetical, and skips coins at zero', () => {
+    const id = 'starter-1' // Groceries
+    let book: Book = starterBook()
+    for (const ticker of ['XMR', 'BTC', 'ETH', 'ZEC']) book = addCoin(book, ticker)
+    const fund = (ticker: string) => (b: Book) => changeCoin(b, ticker, budget => move(deposit(budget, 10n), READY_TO_ASSIGN, id, 5n))
+    book = fund('XMR')(fund('BTC')(fund('ETH')(book)))
+    // ETH: spent down to zero. BTC: an edit leaves a deficit of 3.
+    book = changeCoin(book, 'ETH', budget => spend(budget, id, 5n))
+    book = changeCoin(book, 'BTC', budget => {
+      const spent = spend(budget, id, 5n, { note: '', date: '2026-10-01' }, 's1')
+      return editTransaction(spent, 's1', { from: id, amount: 8n, note: '', date: '2026-10-01' })
+    })
+    expect(holders(book, id)).toEqual(['BTC', 'XMR'])
+    expect(holders(book, 'starter-2')).toEqual([])
+    expect(holders(starterBook(), id)).toEqual([])
+  })
+})
+
+describe('0.4.1: the note box counts characters as the ledger does (B9)', () => {
+  const thirty = 'a'.repeat(28) + '🦀🛸'
+
+  it('counts an emoji as one character, so 30 emoji fit', () => {
+    const emoji = '🛸'.repeat(30)
+    expect(emoji.length).toBe(60)
+    expect(capNote(emoji, '🛸'.repeat(29))).toBe(emoji)
+    expect(capNote(thirty, thirty.slice(0, -2))).toBe(thirty)
+  })
+
+  it('refuses a 31st character, and keeps the first 30 of a paste that runs over', () => {
+    expect(capNote(thirty + '🛸', thirty)).toBe(thirty)
+    expect(capNote('x' + thirty, thirty)).toBe(thirty)
+    expect(capNote('🛸'.repeat(40), '')).toBe('🛸'.repeat(30))
   })
 })
